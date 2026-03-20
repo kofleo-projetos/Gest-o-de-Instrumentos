@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCB — Gestão de Instrumentos Musicais</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc, writeBatch, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDjF0xHMBAJWyy-bN6ElmjjXTa2UOYXUus",
+  authDomain: "controle-de-instrumento.firebaseapp.com",
+  projectId: "controle-de-instrumento",
+  storageBucket: "controle-de-instrumento.firebasestorage.app",
+  messagingSenderId: "397436669640",
+  appId: "1:397436669640:web:fec571e97b8c461ed61ffd"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ══════════ FIREBASE BRIDGE ══════════
+// Expõe funções ao escopo global para o código legado
+window._fb = {
+  db,
+  doc, setDoc, getDoc, collection, getDocs, deleteDoc, writeBatch, onSnapshot,
+
+  // Salva coleção inteira no Firestore (sobrescreve com batch)
+  async saveCollection(colName, arr) {
+    try {
+      const batch = writeBatch(db);
+      // Apaga documentos antigos desta coleção
+      const snap = await getDocs(collection(db, colName));
+      snap.forEach(d => batch.delete(d.ref));
+      // Grava os novos
+      arr.forEach(item => {
+        const ref = doc(collection(db, colName), String(item.id));
+        batch.set(ref, item);
+      });
+      await batch.commit();
+      return true;
+    } catch(e) {
+      console.warn('Firebase saveCollection erro:', e);
+      return false;
+    }
+  },
+
+  // Carrega coleção inteira do Firestore
+  async loadCollection(colName) {
+    try {
+      const snap = await getDocs(collection(db, colName));
+      if (snap.empty) return null;
+      return snap.docs.map(d => d.data());
+    } catch(e) {
+      console.warn('Firebase loadCollection erro:', e);
+      return null;
+    }
+  },
+
+  isOnline() { return navigator.onLine; }
+};
+
+// Dispara evento quando Firebase estiver pronto
+window.dispatchEvent(new Event('firebaseReady'));
+</script>
+<style>
+:root {
+  --bg:#f5f4f1; --white:#ffffff; --surf2:#eeece8; --surf3:#e6e3de;
+  --border:#dedad3; --border2:#c8c3ba;
+  --navy:#1c3557; --navy2:#254878; --navy-light:#eaeff7;
+  --gold:#9a6f1a; --gold-light:#fdf5e0;
+  --text:#18160f; --dim:#4a4640; --muted:#8c8780;
+  --green:#1a6e3f; --green-bg:#e6f4ec;
+  --orange:#b84f00; --orange-bg:#fdeee3;
+  --red:#b31c1c; --red-bg:#fce8e8;
+  --blue:#1a3f8a; --blue-bg:#e8eef8;
+  --purple:#5c2d96; --purple-bg:#ede6f8;
+  --yellow:#a05c00; --yellow-bg:#fff3d6;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 4px 14px rgba(0,0,0,.05);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Source Sans 3',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+
+/* ── SYNC STATUS ── */
+#sync-bar{position:fixed;top:0;left:0;right:0;z-index:999;height:3px;background:transparent;transition:background .3s}
+#sync-bar.syncing{background:linear-gradient(90deg,var(--navy),var(--gold),var(--navy));background-size:200%;animation:syncAnim 1.2s linear infinite}
+#sync-bar.ok{background:var(--green);animation:fadeBar 1.5s forwards}
+#sync-bar.offline{background:var(--orange)}
+@keyframes syncAnim{0%{background-position:200%}100%{background-position:0%}}
+@keyframes fadeBar{0%{opacity:1}80%{opacity:1}100%{opacity:0}}
+
+#status-pill{position:fixed;bottom:54px;right:16px;z-index:998;padding:4px 10px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.04em;border:1px solid transparent;transition:all .3s;pointer-events:none}
+#status-pill.online{background:var(--green-bg);color:var(--green);border-color:#b0d9c2}
+#status-pill.offline{background:var(--orange-bg);color:var(--orange);border-color:#f0c099}
+#status-pill.syncing{background:var(--navy-light);color:var(--navy);border-color:#afc3e8}
+#status-pill.pending{background:var(--yellow-bg);color:var(--yellow);border-color:#f0cc88}
+
+/* ── SIDEBAR ── */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:224px;background:var(--navy);display:flex;flex-direction:column;z-index:200;box-shadow:2px 0 12px rgba(0,0,0,.15)}
+.sb-logo{padding:20px 18px 15px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sb-logo .brand{font-family:'Playfair Display',serif;font-size:16.5px;color:#fff;line-height:1.25}
+.sb-logo .sub{font-size:9.5px;color:rgba(255,255,255,.45);letter-spacing:.1em;text-transform:uppercase;margin-top:2px}
+.sb-nav{flex:1;padding:8px 10px;overflow-y:auto;scrollbar-width:thin}
+.sb-section{font-size:9px;color:rgba(255,255,255,.32);letter-spacing:.12em;text-transform:uppercase;padding:12px 8px 3px}
+.sb-item{display:flex;align-items:center;gap:8px;padding:7.5px 10px;border-radius:6px;cursor:pointer;color:rgba(255,255,255,.68);font-size:12.5px;margin-bottom:1px;transition:all .14s;user-select:none}
+.sb-item:hover{background:rgba(255,255,255,.1);color:#fff}
+.sb-item.active{background:rgba(255,255,255,.17);color:#fff;font-weight:600}
+.sb-item .ic{width:16px;text-align:center;font-size:13px;flex-shrink:0}
+.sb-badge{margin-left:auto;background:rgba(255,255,255,.14);color:rgba(255,255,255,.88);border-radius:20px;padding:1px 7px;font-size:9.5px;font-weight:700}
+.sb-foot{padding:10px 18px;border-top:1px solid rgba(255,255,255,.1);font-size:9.5px;color:rgba(255,255,255,.28);text-align:center}
+
+/* ── MAIN ── */
+.main{margin-left:224px;min-height:100vh;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;background:var(--white);border-bottom:1px solid var(--border);padding:10px 26px;display:flex;align-items:center;gap:10px;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.page-title{font-family:'Playfair Display',serif;font-size:19px;color:var(--navy);flex:1}
+.tb-actions{display:flex;gap:7px}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:6px;border:1px solid var(--border2);background:var(--white);color:var(--dim);cursor:pointer;font-family:'Source Sans 3',sans-serif;font-size:12px;font-weight:500;transition:all .14s;white-space:nowrap;text-decoration:none}
+.btn:hover{border-color:var(--navy);color:var(--navy);background:var(--navy-light)}
+.btn-sm{padding:4px 9px;font-size:11px}
+.btn-primary{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600}
+.btn-primary:hover{background:var(--navy2);border-color:var(--navy2);color:#fff}
+.btn-success{border-color:var(--green);color:var(--green)}
+.btn-success:hover{background:var(--green-bg)}
+.btn-danger{border-color:var(--red);color:var(--red)}
+.btn-danger:hover{background:var(--red-bg)}
+.btn-gold{border-color:var(--gold);color:var(--gold)}
+.btn-gold:hover{background:var(--gold-light)}
+
+/* ── CONTENT ── */
+.content{padding:22px 26px;flex:1}
+.page{display:none}.page.active{display:block}
+
+/* ── STATS ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow);border-top:3px solid var(--border)}
+.stat.s-blue{border-top-color:var(--navy2)} .stat.s-green{border-top-color:var(--green)}
+.stat.s-orange{border-top-color:var(--orange)} .stat.s-red{border-top-color:var(--red)}
+.stat.s-gold{border-top-color:var(--gold)} .stat.s-yellow{border-top-color:var(--yellow)}
+.stat-lbl{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px}
+.stat-val{font-family:'Playfair Display',serif;font-size:28px;color:var(--text);line-height:1}
+.stat-sub{font-size:10.5px;color:var(--muted);margin-top:2px}
+
+/* ── CHARTS ── */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.chart-card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px 18px;box-shadow:var(--shadow)}
+.chart-title{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:13px}
+.bar-chart{display:flex;flex-direction:column;gap:6px}
+.bar-row{display:flex;align-items:center;gap:8px}
+.bar-lbl{width:92px;font-size:11.5px;color:var(--dim);flex-shrink:0;text-align:right}
+.bar-track{flex:1;height:7px;background:var(--surf2);border-radius:20px;overflow:hidden}
+.bar-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,var(--navy),var(--navy2));transition:width .5s}
+.bar-val{width:22px;font-size:11px;font-weight:700;color:var(--navy);text-align:right}
+.donut-wrap{display:flex;align-items:center;gap:18px}
+.donut-legend{flex:1;display:flex;flex-direction:column;gap:6px}
+.donut-row{display:flex;align-items:center;gap:6px;font-size:11.5px}
+.donut-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.donut-lbl{color:var(--dim);flex:1}
+.donut-val{font-weight:700;color:var(--text)}
+.alert-item{display:flex;align-items:flex-start;gap:7px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+.alert-item:last-child{border-bottom:none}
+.alert-dot{width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0}
+
+/* ── FILTERS ── */
+.filters{display:flex;gap:7px;margin-bottom:13px;flex-wrap:wrap;align-items:center}
+.search-box{flex:1;min-width:180px;position:relative}
+.search-box input{width:100%;background:var(--white);border:1px solid var(--border);border-radius:6px;padding:7px 10px 7px 30px;color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:13px;outline:none;transition:border-color .14s}
+.search-box input:focus{border-color:var(--navy)}
+.search-box input::placeholder{color:var(--muted)}
+.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+select.fsel{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:12px;outline:none;cursor:pointer;transition:border-color .14s}
+select.fsel:focus{border-color:var(--navy)}
+
+/* ── TABLE ── */
+.tbl-wrap{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+.tbl-head{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;border-bottom:1px solid var(--border);background:var(--surf2)}
+.tbl-title{font-weight:700;font-size:13px;color:var(--navy)}
+.tbl-cnt{font-size:11px;color:var(--muted);margin-left:5px}
+table{width:100%;border-collapse:collapse}
+thead th{background:var(--surf2);padding:8px 10px;text-align:left;font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;cursor:pointer;user-select:none;border-bottom:1px solid var(--border)}
+thead th:hover{color:var(--navy)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--navy-light)}
+tbody td{padding:8px 10px;font-size:12.5px;color:var(--text);vertical-align:middle}
+.td-num{font-family:'Playfair Display',serif;font-size:13px;color:var(--navy);font-weight:600;white-space:nowrap}
+.td-bold{font-weight:600}
+.td-dim{color:var(--dim);font-size:12px}
+.td-money{font-weight:700;color:var(--green);font-size:12px}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;border:1px solid transparent}
+.badge::before{content:'● ';font-size:6px;vertical-align:middle}
+.b-disp{background:var(--green-bg);color:var(--green);border-color:#b0d9c2}
+.b-emp{background:var(--orange-bg);color:var(--orange);border-color:#f0c099}
+.b-neg{background:var(--purple-bg);color:var(--purple);border-color:#c3aee8}
+.b-fin{background:var(--blue-bg);color:var(--blue);border-color:#afc3e8}
+.b-man{background:var(--yellow-bg);color:var(--yellow);border-color:#f0cc88}
+
+/* ── MODAL ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:300;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--white);border:1px solid var(--border);border-radius:12px;max-width:96vw;max-height:93vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:mIn .2s ease}
+@keyframes mIn{from{opacity:0;transform:translateY(-10px) scale(.98)}to{opacity:1;transform:none}}
+.modal-w640{width:640px} .modal-w500{width:500px} .modal-w460{width:460px}
+.m-head{padding:17px 22px 12px;border-bottom:1px solid var(--border);background:var(--surf2);display:flex;align-items:center;gap:11px}
+.m-icon{width:36px;height:36px;background:var(--navy-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--navy);font-family:'Playfair Display',serif;font-weight:700;flex-shrink:0}
+.m-title{font-family:'Playfair Display',serif;font-size:16.5px;color:var(--navy)}
+.m-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.m-close{margin-left:auto;background:none;border:1px solid var(--border);color:var(--muted);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .14s;flex-shrink:0}
+.m-close:hover{border-color:var(--red);color:var(--red)}
+.m-body{padding:15px 22px 20px}
+.m-footer{padding:10px 22px 18px;display:flex;gap:7px;justify-content:flex-end;border-top:1px solid var(--border)}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg-lbl{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.fi,.fs,.ft{background:var(--white);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:'Source Sans 3',sans-serif;font-size:13px;outline:none;transition:border-color .14s;width:100%}
+.fi:focus,.fs:focus,.ft:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(28,53,87,.08)}
+.ft{resize:vertical;min-height:56px}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.full{grid-column:1/-1}
+.ip{position:relative}.ip span{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px;pointer-events:none}.ip .fi{padding-left:26px}
+
+/* ── IGREJAS ── */
+.igrejas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:13px}
+.ig-card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+.ig-hd{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:8px}
+.ig-hd .name{font-family:'Playfair Display',serif;font-size:14px;flex:1}
+.ig-hd .cnt{font-size:10.5px;opacity:.65}
+.ig-body{padding:11px 16px}
+.ig-row{display:flex;justify-content:space-between;font-size:12px;padding:3.5px 0;border-bottom:1px solid var(--border)}
+.ig-row:last-child{border-bottom:none}
+.ig-row-lbl{color:var(--muted)}
+.ig-row-val{font-weight:700}
+.ig-foot{padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:5px}
+
+/* ── MOVIMENTAÇÃO ── */
+.mov-list{display:flex;flex-direction:column;gap:9px}
+.mov-item{background:var(--white);border:1px solid var(--border);border-radius:9px;padding:11px 15px;display:flex;align-items:center;gap:11px;box-shadow:var(--shadow)}
+.mov-ico{width:34px;height:34px;border-radius:8px;background:var(--navy-light);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;color:var(--navy)}
+.mov-info{flex:1}
+.mov-title{font-weight:600;font-size:12.5px}
+.mov-sub{font-size:11px;color:var(--muted);margin-top:1px}
+
+/* ── TERMOS ── */
+.termos-list{display:flex;flex-direction:column;gap:9px}
+.termo-item{background:var(--white);border:1px solid var(--border);border-radius:9px;padding:12px 16px;display:flex;align-items:center;gap:13px;box-shadow:var(--shadow);transition:border-color .14s}
+.termo-item:hover{border-color:var(--navy)}
+.termo-ico{width:36px;height:36px;background:var(--gold-light);border:1px solid #e0cc88;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.termo-info{flex:1}
+.termo-name{font-weight:700;font-size:13px}
+.termo-desc{font-size:11px;color:var(--muted);margin-top:1px}
+.termo-link{font-size:11px;color:var(--blue);margin-top:2px;word-break:break-all}
+.termo-acts{display:flex;gap:5px;flex-shrink:0}
+
+/* ── SEGURO ── */
+.seg-banner{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;border-radius:12px;padding:20px 24px;margin-bottom:18px;display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.seg-item{flex:1;min-width:120px}
+.seg-lbl{font-size:9px;opacity:.65;text-transform:uppercase;letter-spacing:.09em;font-weight:700}
+.seg-val{font-family:'Playfair Display',serif;font-size:24px;margin-top:3px;line-height:1}
+.seg-sub{font-size:10px;opacity:.55;margin-top:1px}
+
+/* ── CONFIRM ── */
+.confirm-modal{background:var(--white);border:1px solid var(--border);border-radius:11px;padding:22px;max-width:340px;width:92vw;box-shadow:var(--shadow-lg);animation:mIn .2s ease}
+.confirm-modal h3{font-family:'Playfair Display',serif;font-size:17px;margin-bottom:6px}
+.confirm-modal p{font-size:12.5px;color:var(--dim);margin-bottom:16px;line-height:1.55}
+.confirm-acts{display:flex;gap:7px;justify-content:flex-end}
+
+/* ── TOAST ── */
+.toast-wrap{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:5px;z-index:999}
+.toast{background:var(--white);border:1px solid var(--border);border-left-width:3px;border-radius:7px;padding:9px 14px;font-size:12.5px;box-shadow:var(--shadow-lg);animation:tIn .22s ease;display:flex;align-items:center;gap:7px;min-width:180px}
+.toast.ok{border-left-color:var(--green)}.toast.ok .tic{color:var(--green)}
+.toast.err{border-left-color:var(--red)}.toast.err .tic{color:var(--red)}
+.toast.inf{border-left-color:var(--navy)}.toast.inf .tic{color:var(--navy)}
+@keyframes tIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+
+/* ── SECTION TITLE ── */
+.sec-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--navy);margin-bottom:14px;padding-bottom:9px;border-bottom:2px solid var(--navy-light);display:flex;align-items:center;justify-content:space-between}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty .ei{font-size:36px;margin-bottom:8px}
+.empty .et{font-size:13.5px;color:var(--dim)}
+.empty .es{font-size:11.5px;margin-top:4px}
+
+/* ── LOADING ── */
+#loading-screen{position:fixed;inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#fff;gap:14px}
+#loading-screen .ls-title{font-family:'Playfair Display',serif;font-size:22px}
+#loading-screen .ls-sub{font-size:12px;opacity:.6}
+.spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media print{.sidebar,.topbar,.filters,.modal,.toast-wrap,.btn{display:none!important}.main{margin-left:0!important}.content{padding:0!important}body{background:#fff!important}}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="ls-title">♪ CCB Orquestra</div>
+  <div class="ls-sub">Carregando dados...</div>
+</div>
+
+<!-- Barra de sincronização -->
+<div id="sync-bar"></div>
+<div id="status-pill" class="online">● Online</div>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-logo">
+    <div class="brand">♪ CCB Orquestra</div>
+    <div class="sub">Gestão de Instrumentos</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Painel</div>
+    <div class="sb-item active" onclick="nav('dashboard',this)"><span class="ic">⊞</span>Dashboard</div>
+    <div class="sb-item" onclick="nav('instrumentos',this)"><span class="ic">♪</span>Instrumentos<span class="sb-badge" id="b-tot">0</span></div>
+    <div class="sb-section">Cadastros</div>
+    <div class="sb-item" onclick="nav('igrejas',this)"><span class="ic">⌂</span>Igrejas / Locais</div>
+    <div class="sb-item" onclick="nav('termos',this)"><span class="ic">📂</span>Termos de Doação</div>
+    <div class="sb-section">Operações</div>
+    <div class="sb-item" onclick="nav('movimentacao',this)"><span class="ic">⇆</span>Movimentação</div>
+    <div class="sb-item" onclick="nav('seguro',this)"><span class="ic">◈</span>Inventário / Seguro</div>
+    <div class="sb-section">Filtros Rápidos</div>
+    <div class="sb-item" onclick="nav('instrumentos',this);setTimeout(()=>{fst.value='Disponível';renderTable()},50)"><span class="ic">✦</span>Disponíveis<span class="sb-badge" id="b-disp">0</span></div>
+    <div class="sb-item" onclick="nav('instrumentos',this);setTimeout(()=>{fst.value='Emprestado';renderTable()},50)"><span class="ic">↗</span>Emprestados<span class="sb-badge" id="b-emp">0</span></div>
+    <div class="sb-item" onclick="nav('instrumentos',this);setTimeout(()=>{fst.value='Em Manutenção';renderTable()},50)"><span class="ic">⚙</span>Manutenção<span class="sb-badge" id="b-man">0</span></div>
+  </nav>
+  <div class="sb-foot" style="padding:10px 14px;text-align:center">
+  <div style="color:rgba(255,255,255,.28);font-size:9.5px;margin-bottom:8px">v2.1 Firebase · CCB Gestão · 2025</div>
+  <div style="color:rgba(255,255,255,.18);font-size:8.5px;margin-bottom:10px">Desenvolvido por<br><span style="color:rgba(255,255,255,.45);font-weight:600">Leandro Machado</span></div>
+  <div style="display:flex;flex-direction:column;gap:5px">
+    <button onclick="expBackup()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.8);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:600;transition:all .14s;display:flex;align-items:center;justify-content:center;gap:5px" onmouseover="this.style.background='rgba(255,255,255,.18)'" onmouseout="this.style.background='rgba(255,255,255,.1)'">⬇ Exportar Backup</button>
+    <label style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .14s" onmouseover="this.style.background='rgba(255,255,255,.14)'" onmouseout="this.style.background='rgba(255,255,255,.07)'">⬆ Importar Backup<input type="file" accept=".json" style="display:none" onchange="impBackup(event)"></label>
+    <button onclick="syncNow()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .14s" onmouseover="this.style.background='rgba(255,255,255,.14)'" onmouseout="this.style.background='rgba(255,255,255,.07)'">☁ Sincronizar Agora</button>
+  </div>
+</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="page-title" id="page-title">Dashboard</div>
+    <div class="tb-actions">
+      <button class="btn btn-gold" onclick="expCSV()">⬇ CSV</button>
+      <button class="btn btn-success" onclick="expPDFLista()">⬇ PDF Lista</button>
+      <button class="btn btn-primary" onclick="openIM()">＋ Novo Instrumento</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-row">
+        <div class="stat s-blue"><div class="stat-lbl">Total</div><div class="stat-val" id="st-tot">—</div><div class="stat-sub">instrumentos</div></div>
+        <div class="stat s-green"><div class="stat-lbl">Disponíveis</div><div class="stat-val" id="st-disp">—</div><div class="stat-sub">prontos para uso</div></div>
+        <div class="stat s-orange"><div class="stat-lbl">Emprestados</div><div class="stat-val" id="st-emp">—</div><div class="stat-sub">em uso</div></div>
+        <div class="stat s-red"><div class="stat-lbl">Manutenção</div><div class="stat-val" id="st-man">—</div><div class="stat-sub">em reparo</div></div>
+        <div class="stat s-gold"><div class="stat-lbl">Valor Acervo</div><div class="stat-val" id="st-val" style="font-size:19px">—</div><div class="stat-sub">para seguro</div></div>
+        <div class="stat s-yellow"><div class="stat-lbl">Igrejas</div><div class="stat-val" id="st-ig">—</div><div class="stat-sub">cadastradas</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card"><div class="chart-title">Instrumentos por Tipo</div><div class="bar-chart" id="ch-tipo"></div></div>
+        <div class="chart-card"><div class="chart-title">Status</div><div class="donut-wrap"><canvas id="donut" width="108" height="108"></canvas><div class="donut-legend" id="donut-leg"></div></div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card"><div class="chart-title">Por Local de Uso</div><div class="bar-chart" id="ch-loc"></div></div>
+        <div class="chart-card"><div class="chart-title">Alertas &amp; Pendências</div><div id="alertas"></div></div>
+      </div>
+    </div>
+
+    <!-- INSTRUMENTOS -->
+    <div class="page" id="page-instrumentos">
+      <div class="filters">
+        <div class="search-box"><span class="search-icon">⌕</span><input id="fsearch" type="text" placeholder="Buscar nome, responsável, cor, origem, local..." oninput="renderTable()"></div>
+        <select class="fsel" id="ftipo" onchange="renderTable()"><option value="">Todos os tipos</option></select>
+        <select class="fsel" id="fst" onchange="renderTable()">
+          <option value="">Todos os status</option>
+          <option>Disponível</option><option>Emprestado</option><option>Em Manutenção</option><option>Negociado</option><option>Finalidade</option>
+        </select>
+        <select class="fsel" id="fig" onchange="renderTable()"><option value="">Todas as igrejas</option></select>
+        <button class="btn" onclick="window.print()">⎙ Imprimir</button>
+      </div>
+      <div class="tbl-wrap">
+        <div class="tbl-head">
+          <div><span class="tbl-title">Relação de Instrumentos</span><span class="tbl-cnt" id="tbl-cnt"></span></div>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr>
+              <th onclick="srt('num')"># ↕</th>
+              <th onclick="srt('nome')">Instrumento ↕</th>
+              <th onclick="srt('modelo')">Tom ↕</th>
+              <th onclick="srt('cor')">Cor ↕</th>
+              <th onclick="srt('marca')">Marca ↕</th>
+              <th onclick="srt('origem_doacao')">Origem/Doador ↕</th>
+              <th onclick="srt('igreja')">Igreja ↕</th>
+              <th onclick="srt('local_uso')">Local de Uso ↕</th>
+              <th>Termo</th>
+              <th onclick="srt('valor')">Valor ↕</th>
+              <th onclick="srt('status')">Status ↕</th>
+              <th onclick="srt('resp')">Responsável ↕</th>
+              <th style="text-align:center">Ações</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- IGREJAS -->
+    <div class="page" id="page-igrejas">
+      <div class="sec-title">Igrejas / Locais<button class="btn btn-primary" onclick="openIG()">＋ Nova Igreja</button></div>
+      <div class="igrejas-grid" id="igrejas-grid"></div>
+    </div>
+
+    <!-- TERMOS -->
+    <div class="page" id="page-termos">
+      <div class="sec-title">Termos de Doação<button class="btn btn-primary" onclick="openTR()">＋ Novo Termo</button></div>
+      <div class="termos-list" id="termos-list"></div>
+    </div>
+
+    <!-- MOVIMENTAÇÃO -->
+    <div class="page" id="page-movimentacao">
+      <div class="sec-title">Movimentação entre Igrejas<button class="btn btn-primary" onclick="openMV()">＋ Nova Movimentação</button></div>
+      <div class="mov-list" id="mov-list"></div>
+    </div>
+
+    <!-- SEGURO -->
+    <div class="page" id="page-seguro">
+      <div class="seg-banner" id="seg-banner"></div>
+      <div class="sec-title">Inventário Valorado<button class="btn btn-gold" onclick="expPDFSeguro()">📄 PDF Seguro</button></div>
+      <div class="tbl-wrap">
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>#</th><th>Instrumento</th><th>Tom</th><th>Cor</th><th>Marca</th><th>Origem/Doador</th><th>Igreja</th><th>Local de Uso</th><th>Status</th><th>Valor R$</th></tr></thead>
+            <tbody id="seg-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL INSTRUMENTO -->
+<div class="overlay" id="ov-instr" onclick="if(event.target===this)closeIM()">
+  <div class="modal modal-w640">
+    <div class="m-head"><div class="m-icon" id="mi-ico">♪</div><div><div class="m-title" id="mi-title">Novo Instrumento</div><div class="m-sub" id="mi-sub">Preencha os campos</div></div><button class="m-close" onclick="closeIM()">✕</button></div>
+    <div class="m-body">
+      <div class="fgrid">
+        <div class="fg"><label class="fg-lbl">Número</label><input class="fi" id="fi-num" type="number" placeholder="Ex: 25"></div>
+        <div class="fg"><label class="fg-lbl">Instrumento *</label><input class="fi" id="fi-nome" type="text" placeholder="Ex: Violino, Trompete"></div>
+        <div class="fg"><label class="fg-lbl">Tom / Modelo</label><input class="fi" id="fi-modelo" type="text" placeholder="Ex: Sib, Mib, 4/4"></div>
+        <div class="fg"><label class="fg-lbl">Cor</label><input class="fi" id="fi-cor" type="text" placeholder="Ex: Marrom Escuro"></div>
+        <div class="fg"><label class="fg-lbl">Marca</label><input class="fi" id="fi-marca" type="text" placeholder="Ex: Chines, Eagle, Weril"></div>
+        <div class="fg"><label class="fg-lbl">Valor R$ (para Seguro)</label><div class="ip"><span>R$</span><input class="fi" id="fi-valor" type="number" step="0.01" placeholder="0,00"></div></div>
+        <div class="fg full"><label class="fg-lbl">Origem / Doador</label><input class="fi" id="fi-origem" type="text" placeholder="Ex: Ir. João Silva, Oficina dos Anjos, Phx Instrumentos"></div>
+        <div class="fg"><label class="fg-lbl">Igreja Responsável</label><select class="fs" id="fi-igreja"><option value="">— Selecionar —</option></select></div>
+        <div class="fg"><label class="fg-lbl">Local de Uso Atual</label><input class="fi" id="fi-local" type="text" placeholder="Ex: Jardim Vitória, Serpa, Morro Grande"></div>
+        <div class="fg"><label class="fg-lbl">Status</label>
+          <select class="fs" id="fi-status"><option>Disponível</option><option>Emprestado</option><option>Em Manutenção</option><option>Negociado</option><option>Finalidade</option></select>
+        </div>
+        <div class="fg"><label class="fg-lbl">Responsável (Está com:)</label><input class="fi" id="fi-resp" type="text" placeholder="Nome do responsável"></div>
+        <div class="fg full"><label class="fg-lbl">Termo de Doação / Documento</label><input class="fi" id="fi-termo" type="text" placeholder="Ex: Termo Assinado, Nota Fiscal 47913, Ordem Serviço 2937"></div>
+        <div class="fg full"><label class="fg-lbl">Observações</label><textarea class="ft" id="fi-obs" placeholder="Estado de conservação, pendências, notas..."></textarea></div>
+      </div>
+    </div>
+    <div class="m-footer"><button class="btn" onclick="closeIM()">Cancelar</button><button class="btn btn-primary" onclick="saveI()">💾 Salvar Instrumento</button></div>
+  </div>
+</div>
+
+<!-- MODAL IGREJA -->
+<div class="overlay" id="ov-ig" onclick="if(event.target===this)closeIG()">
+  <div class="modal modal-w460">
+    <div class="m-head"><div class="m-icon">⌂</div><div><div class="m-title" id="ig-title">Nova Igreja / Local</div><div class="m-sub">Cadastro de congregação</div></div><button class="m-close" onclick="closeIG()">✕</button></div>
+    <div class="m-body">
+      <div class="fgrid">
+        <div class="fg full"><label class="fg-lbl">Nome *</label><input class="fi" id="ig-nome" type="text" placeholder="Ex: Jardim Vitória"></div>
+        <div class="fg full"><label class="fg-lbl">Endereço</label><input class="fi" id="ig-end" type="text" placeholder="Rua, número, bairro"></div>
+        <div class="fg"><label class="fg-lbl">Cidade</label><input class="fi" id="ig-cidade" type="text" placeholder="Ex: Franco da Rocha"></div>
+        <div class="fg"><label class="fg-lbl">Encarregado</label><input class="fi" id="ig-enc" type="text" placeholder="Nome do encarregado"></div>
+        <div class="fg full"><label class="fg-lbl">Telefone / Contato</label><input class="fi" id="ig-tel" type="text" placeholder="(11) 00000-0000"></div>
+        <div class="fg full"><label class="fg-lbl">Observações</label><textarea class="ft" id="ig-obs" placeholder="Notas..."></textarea></div>
+      </div>
+    </div>
+    <div class="m-footer"><button class="btn" onclick="closeIG()">Cancelar</button><button class="btn btn-primary" onclick="saveIG()">💾 Salvar</button></div>
+  </div>
+</div>
+
+<!-- MODAL TERMO -->
+<div class="overlay" id="ov-tr" onclick="if(event.target===this)closeTR()">
+  <div class="modal modal-w500">
+    <div class="m-head"><div class="m-icon">📂</div><div><div class="m-title" id="tr-title">Novo Termo de Doação</div><div class="m-sub">Cadastro de pasta / link de documentos</div></div><button class="m-close" onclick="closeTR()">✕</button></div>
+    <div class="m-body">
+      <div class="fgrid">
+        <div class="fg full"><label class="fg-lbl">Nome / Descrição *</label><input class="fi" id="tr-nome" type="text" placeholder="Ex: Termos Jardim Vitória 2024"></div>
+        <div class="fg full"><label class="fg-lbl">Link da Pasta (Google Drive, OneDrive, etc.)</label><input class="fi" id="tr-link" type="url" placeholder="https://drive.google.com/drive/folders/..."></div>
+        <div class="fg"><label class="fg-lbl">Igreja / Local Relacionado</label><select class="fs" id="tr-ig"><option value="">— Selecionar —</option></select></div>
+        <div class="fg"><label class="fg-lbl">Responsável pelos Documentos</label><input class="fi" id="tr-resp" type="text" placeholder="Nome do responsável"></div>
+        <div class="fg full"><label class="fg-lbl">Observações</label><textarea class="ft" id="tr-obs" placeholder="Quantidade de termos, pendências, etc."></textarea></div>
+      </div>
+    </div>
+    <div class="m-footer"><button class="btn" onclick="closeTR()">Cancelar</button><button class="btn btn-primary" onclick="saveTR()">💾 Salvar</button></div>
+  </div>
+</div>
+
+<!-- MODAL MOVIMENTAÇÃO -->
+<div class="overlay" id="ov-mv" onclick="if(event.target===this)closeMV()">
+  <div class="modal modal-w500">
+    <div class="m-head"><div class="m-icon">⇆</div><div><div class="m-title">Nova Movimentação</div><div class="m-sub">Transferência de instrumento entre igrejas</div></div><button class="m-close" onclick="closeMV()">✕</button></div>
+    <div class="m-body">
+      <div class="fgrid">
+        <div class="fg full"><label class="fg-lbl">Instrumento *</label><select class="fs" id="mv-inst"><option value="">— Selecionar —</option></select></div>
+        <div class="fg"><label class="fg-lbl">Igreja de Origem</label><select class="fs" id="mv-orig"><option value="">— Selecionar —</option></select></div>
+        <div class="fg"><label class="fg-lbl">Igreja de Destino *</label><select class="fs" id="mv-dest"><option value="">— Selecionar —</option></select></div>
+        <div class="fg"><label class="fg-lbl">Data</label><input class="fi" id="mv-data" type="date"></div>
+        <div class="fg"><label class="fg-lbl">Responsável pelo Transporte</label><input class="fi" id="mv-resp" type="text" placeholder="Nome do irmão"></div>
+        <div class="fg full"><label class="fg-lbl">Motivo / Observações</label><textarea class="ft" id="mv-obs" placeholder="Ex: Empréstimo temporário para louvor da congregação..."></textarea></div>
+      </div>
+    </div>
+    <div class="m-footer">
+      <button class="btn" onclick="closeMV()">Cancelar</button>
+      <button class="btn btn-gold" onclick="saveMV(true)">📄 Salvar + Declaração PDF</button>
+      <button class="btn btn-primary" onclick="saveMV(false)">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM -->
+<div class="overlay" id="ov-conf">
+  <div class="confirm-modal">
+    <h3 id="conf-title">Confirmar</h3>
+    <p id="conf-msg">Tem certeza?</p>
+    <div class="confirm-acts"><button class="btn" onclick="closeConf()">Cancelar</button><button class="btn btn-danger" id="conf-ok">Confirmar</button></div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+// ══════════ DADOS INICIAIS ══════════
+const IGREJAS0=[
+  {id:1001,nome:'Jardim Vitória',end:'',cidade:'Franco da Rocha',enc:'Ir. Carlos Cooperador',tel:'',obs:''},
+  {id:1002,nome:'Vila Ipojuca',end:'',cidade:'',enc:'Ir. Jairo Silva',tel:'',obs:''},
+  {id:1003,nome:'Jd. Marcelino',end:'',cidade:'',enc:'',tel:'',obs:''},
+  {id:1004,nome:'Vila dos Pinheiros',end:'',cidade:'',enc:'Ir. Claudio Moia',tel:'',obs:''},
+  {id:1005,nome:'Morro Grande',end:'',cidade:'',enc:'Ir. Renato',tel:'',obs:''},
+  {id:1006,nome:'Mairiporã',end:'',cidade:'Mairiporã',enc:'Servitec',tel:'',obs:''},
+  {id:1007,nome:'Serpa',end:'',cidade:'',enc:'Ir. Ismael Barbosa',tel:'',obs:''},
+  {id:1008,nome:'São Paulo',end:'',cidade:'São Paulo',enc:'',tel:'',obs:''},
+];
+const INST0=[
+  {id:1,num:1,nome:'Viola de Arco',modelo:'39',cor:'Vinho',origem_doacao:'Oficina dos Anjos',termo:'',igreja:'Jardim Vitória',local_uso:'São Paulo',marca:'Cinhes',status:'Finalidade',resp:'Lucas',valor:0,obs:''},
+  {id:2,num:1,nome:'Violino',modelo:'Sib',cor:'Marrom Natural Escuro',origem_doacao:'Ir. Renato Enc. Morro Grande',termo:'Termo Assinado',igreja:'Morro Grande',local_uso:'Morro Grande',marca:'Chines',status:'Disponível',resp:'Miguel (Mãe Sara)',valor:350,obs:''},
+  {id:3,num:2,nome:'Violino',modelo:'Sib',cor:'Amarelo com Marrom no Meio',origem_doacao:'Ir. Rebeca Justino',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Jd. Marcelino',marca:'Chines',status:'Emprestado',resp:'Rafael (Pai Luiz)',valor:350,obs:''},
+  {id:4,num:3,nome:'Violino',modelo:'Sib',cor:'Amarelo Escuro',origem_doacao:'Ir. Claudio Moia',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Vila dos Pinheiros',marca:'Chines',status:'Disponível',resp:'',valor:350,obs:''},
+  {id:5,num:4,nome:'Violino',modelo:'Sib',cor:'Marrom Escuro',origem_doacao:'Helio e Daniele',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'Dominante 3/4',status:'Emprestado',resp:'Jonatas (Mãe Marcelia)',valor:480,obs:''},
+  {id:6,num:5,nome:'Violino',modelo:'Sib',cor:'Marrom Fosco',origem_doacao:'Ir Valéria',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Jd. Marcelino',marca:'Chines',status:'Emprestado',resp:'Otávio (Pai Maicon)',valor:350,obs:''},
+  {id:7,num:6,nome:'Violino',modelo:'Sib',cor:'Marrom - Precisa foto',origem_doacao:'Ir. Conceição',termo:'',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'Chines',status:'Emprestado',resp:'Abraão (Mãe Rebeca)',valor:350,obs:'Pendente: foto do instrumento'},
+  {id:8,num:7,nome:'Violino',modelo:'Sib',cor:'Verniz Vermelho',origem_doacao:'Ir. Jairo Silva',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Vila Ipojuca',marca:'Chines - Parrot',status:'Disponível',resp:'',valor:350,obs:''},
+  {id:9,num:8,nome:'Violino',modelo:'Sib',cor:'Vermelho Escuro',origem_doacao:'Phx Instrumentos',termo:'Nota Fiscal 47913',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'Phx Instrumentos',status:'Emprestado',resp:'Jose Carlos (Cooperador)',valor:550,obs:''},
+  {id:10,num:9,nome:'Violino',modelo:'Sib',cor:'Vermelho Escuro',origem_doacao:'Phx Instrumentos',termo:'Nota Fiscal 47913',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'Phx Instrumentos',status:'Emprestado',resp:'Yuri Moraes (Tamara)',valor:550,obs:''},
+  {id:11,num:10,nome:'Violino',modelo:'Sib',cor:'Marrom Claro',origem_doacao:'Oficina dos Anjos',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Vila Ipojuca',marca:'Chines',status:'Disponível',resp:'',valor:350,obs:''},
+  {id:12,num:11,nome:'Violino',modelo:'Sib',cor:'Amarelo Natural',origem_doacao:'Oficina dos Anjos',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Vila Ipojuca',marca:'Chines',status:'Emprestado',resp:'Tiago Fortaleza (Daniele)',valor:350,obs:''},
+  {id:13,num:12,nome:'Violino',modelo:'Sib',cor:'Vermelho Brilhante',origem_doacao:'Oficina dos Anjos',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Vila Ipojuca',marca:'Chines',status:'Emprestado',resp:'Vicenzo Gregorio (David)',valor:350,obs:''},
+  {id:14,num:13,nome:'Violoncelo',modelo:'Sib',cor:'Vermelho Escuro',origem_doacao:'Ir. Marcelo Adriano Ferreira',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'Chines',status:'Emprestado',resp:'Paulo Antonio',valor:800,obs:''},
+  {id:15,num:14,nome:'Violoncelo',modelo:'Sib',cor:'Marrom Escuro',origem_doacao:'Ir. Jairo Silva',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Vila Ipojuca',marca:'Chines',status:'Emprestado',resp:'Matheus Henrique',valor:800,obs:''},
+  {id:16,num:15,nome:'Flauta',modelo:'Sib',cor:'Prata',origem_doacao:'Servitec Instrumentos',termo:'Ordem Serviço 2937',igreja:'Mairiporã',local_uso:'Mairiporã',marca:'Eagle',status:'Emprestado',resp:'Angelo (Mãe Gislaine)',valor:420,obs:''},
+  {id:17,num:16,nome:'Clarineta',modelo:'Sib',cor:'Preta',origem_doacao:'Ir. Silvana Dias',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'Lafaiete',status:'Disponível',resp:'',valor:600,obs:''},
+  {id:18,num:17,nome:'Flauta',modelo:'Sib',cor:'Niquelada',origem_doacao:'Ir. Claudio Moia',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Vila dos Pinheiros',marca:'Positron',status:'Disponível',resp:'',valor:380,obs:''},
+  {id:19,num:18,nome:'Clarineta',modelo:'Dó',cor:'Marrom',origem_doacao:'Ir. Marcelo Adriano Ferreira',termo:'Termo Assinado',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'BUGOBOT',status:'Emprestado',resp:'Guilherme (Tia Marcelia)',valor:600,obs:''},
+  {id:20,num:19,nome:'Clarineta',modelo:'Sib',cor:'Marrom',origem_doacao:'Ir. Ismael Barbosa',termo:'Termo Assinado',igreja:'Serpa',local_uso:'Serpa',marca:'Weril',status:'Disponível',resp:'',valor:900,obs:''},
+  {id:21,num:20,nome:'Sax Alto',modelo:'Mib',cor:'Laqueado',origem_doacao:'Ir. Carlos Cooperador',termo:'',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'Folheado',status:'Emprestado',resp:'Gabriel Neves',valor:1200,obs:''},
+  {id:22,num:21,nome:'Bombardino',modelo:'Sib',cor:'Laqueado',origem_doacao:'Ir. Josue Assunção',termo:'',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'Dolphin',status:'Negociado',resp:'Servitec Mairiporã',valor:1500,obs:'Em negociação'},
+  {id:23,num:22,nome:'Trompete',modelo:'Sib',cor:'Laqueado',origem_doacao:'Servitec Instrumentos',termo:'Ordem Serviço 2937',igreja:'Mairiporã',local_uso:'Mairiporã',marca:'Shelter',status:'Emprestado',resp:'Renato Ferreira',valor:750,obs:''},
+  {id:24,num:23,nome:'Flughel Horn',modelo:'Sib',cor:'Laqueado',origem_doacao:'Ir. Mateus Vinicius',termo:'',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'SOYTTIEFFEN',status:'Emprestado',resp:'Matheus Vinicius',valor:950,obs:''},
+  {id:25,num:24,nome:'Trombone',modelo:'Sib',cor:'Prata',origem_doacao:'Ir. Mateus Vinicius',termo:'',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'Hoydem',status:'Emprestado',resp:'Matheus Vinicius',valor:850,obs:''},
+  {id:26,num:25,nome:'Bombardino',modelo:'Sib',cor:'Laqueado',origem_doacao:'Ir. Josue Assunção',termo:'',igreja:'Jardim Vitória',local_uso:'Jardim Vitória',marca:'Suzuki',status:'Emprestado',resp:'Rodrigo Prado',valor:1800,obs:''},
+];
+
+// ══════════ ESTADO ══════════
+let insts=[],igrejas=[],termos=[],movs=[];
+let eInst=null,eIg=null,eTr=null;
+let sCol='num',sDir=1;
+let _fbReady=false;       // Firebase inicializado
+let _pendingSync=false;   // Há dados locais aguardando sync
+
+const fst=document.getElementById('fst');
+const syncBar=document.getElementById('sync-bar');
+const statusPill=document.getElementById('status-pill');
+
+// ══════════ STATUS PILL ══════════
+function setStatus(mode,label){
+  statusPill.className=mode;
+  statusPill.textContent='● '+label;
+  syncBar.className=mode==='syncing'?'syncing':mode==='online'?'ok':'offline';
+}
+
+// ══════════ LOCAL STORAGE (camada offline) ══════════
+function svLocal(){
+  localStorage.setItem('ccb_i',JSON.stringify(insts));
+  localStorage.setItem('ccb_g',JSON.stringify(igrejas));
+  localStorage.setItem('ccb_t',JSON.stringify(termos));
+  localStorage.setItem('ccb_m',JSON.stringify(movs));
+  localStorage.setItem('ccb_pending','1');  // marca pendência
+  _pendingSync=true;
+}
+function ldLocal(){
+  insts=JSON.parse(localStorage.getItem('ccb_i')||'null')||JSON.parse(JSON.stringify(INST0));
+  igrejas=JSON.parse(localStorage.getItem('ccb_g')||'null')||JSON.parse(JSON.stringify(IGREJAS0));
+  termos=JSON.parse(localStorage.getItem('ccb_t')||'[]');
+  movs=JSON.parse(localStorage.getItem('ccb_m')||'[]');
+  _pendingSync=localStorage.getItem('ccb_pending')==='1';
+}
+function clearPending(){
+  localStorage.removeItem('ccb_pending');
+  _pendingSync=false;
+}
+
+// ══════════ FIREBASE (camada cloud) ══════════
+async function svFirebase(){
+  if(!_fbReady||!navigator.onLine)return false;
+  setStatus('syncing','Sincronizando...');
+  try{
+    await Promise.all([
+      window._fb.saveCollection('instrumentos',insts),
+      window._fb.saveCollection('igrejas',igrejas),
+      window._fb.saveCollection('termos',termos),
+      window._fb.saveCollection('movimentacoes',movs),
+    ]);
+    clearPending();
+    // Atualiza localStorage também como cache
+    localStorage.setItem('ccb_i',JSON.stringify(insts));
+    localStorage.setItem('ccb_g',JSON.stringify(igrejas));
+    localStorage.setItem('ccb_t',JSON.stringify(termos));
+    localStorage.setItem('ccb_m',JSON.stringify(movs));
+    setStatus('online','Online · Firebase ✓');
+    return true;
+  }catch(e){
+    console.warn('Firebase sync erro:',e);
+    setStatus('offline','Offline · Local');
+    return false;
+  }
+}
+
+async function ldFirebase(){
+  if(!_fbReady||!navigator.onLine)return false;
+  try{
+    const [fi,fg,ft,fm]=await Promise.all([
+      window._fb.loadCollection('instrumentos'),
+      window._fb.loadCollection('igrejas'),
+      window._fb.loadCollection('termos'),
+      window._fb.loadCollection('movimentacoes'),
+    ]);
+    // Só substitui se o Firebase tiver dados
+    if(fi&&fi.length>0)insts=fi;
+    if(fg&&fg.length>0)igrejas=fg;
+    if(ft)termos=ft;
+    if(fm)movs=fm;
+    // Salva como cache local
+    localStorage.setItem('ccb_i',JSON.stringify(insts));
+    localStorage.setItem('ccb_g',JSON.stringify(igrejas));
+    localStorage.setItem('ccb_t',JSON.stringify(termos));
+    localStorage.setItem('ccb_m',JSON.stringify(movs));
+    clearPending();
+    return true;
+  }catch(e){
+    console.warn('Firebase load erro:',e);
+    return false;
+  }
+}
+
+// ══════════ sv() — salva em ambos ══════════
+async function sv(){
+  svLocal();  // salva imediatamente no local
+  await svFirebase(); // tenta sincronizar (não bloqueia UI)
+}
+
+// ══════════ INICIALIZAÇÃO ══════════
+async function init(){
+  ldLocal(); // carrega local primeiro (instantâneo)
+
+  // Aguarda Firebase ficar pronto (module script)
+  if(!window._fb){
+    await new Promise(res=>{
+      window.addEventListener('firebaseReady',res,{once:true});
+      setTimeout(res,4000); // timeout de segurança
+    });
+  }
+  _fbReady=!!window._fb;
+
+  if(_fbReady&&navigator.onLine){
+    setStatus('syncing','Carregando do Firebase...');
+    const ok=await ldFirebase();
+    if(ok){
+      setStatus('online','Online · Firebase ✓');
+      // Se havia dados locais pendentes, sobe para o Firebase
+      if(_pendingSync)await svFirebase();
+    }else{
+      setStatus('offline','Offline · Dados Locais');
+    }
+  }else{
+    setStatus('offline','Offline · Dados Locais');
+    if(_pendingSync)toast('Dados pendentes — sincronizará quando conectar','inf');
+  }
+
+  // Esconde loading
+  document.getElementById('loading-screen').style.display='none';
+
+  // Renderiza
+  updStats();renderDash();fillFilters();
+}
+
+// ══════════ SINCRONIZAR AGORA (botão manual) ══════════
+async function syncNow(){
+  if(!navigator.onLine){toast('Sem internet no momento','err');return;}
+  if(!_fbReady){toast('Firebase não inicializado','err');return;}
+  toast('Sincronizando com Firebase...','inf');
+  const ok=await svFirebase();
+  if(ok)toast('Sincronizado com sucesso! ☁','ok');
+  else toast('Erro na sincronização','err');
+}
+
+// ══════════ EVENTOS ONLINE/OFFLINE ══════════
+window.addEventListener('online',async()=>{
+  setStatus('syncing','Reconectando...');
+  if(_pendingSync&&_fbReady){
+    await svFirebase();
+    toast('Conexão restaurada — dados sincronizados ☁','ok');
+  }else{
+    setStatus('online','Online · Firebase ✓');
+  }
+});
+window.addEventListener('offline',()=>{
+  setStatus('offline','Offline · Salvando Local');
+  toast('Sem internet — salvando localmente','inf');
+});
+
+// ══════════ NAV ══════════
+function nav(p,el){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  if(el)el.classList.add('active');
+  const T={dashboard:'Dashboard',instrumentos:'Instrumentos',igrejas:'Igrejas / Locais',
+    termos:'Termos de Doação',movimentacao:'Movimentação',seguro:'Inventário / Seguro'};
+  document.getElementById('page-title').textContent=T[p]||p;
+  if(p==='dashboard')renderDash();
+  if(p==='instrumentos'){fillFilters();renderTable();}
+  if(p==='igrejas')renderIG();
+  if(p==='termos')renderTR();
+  if(p==='movimentacao')renderMV();
+  if(p==='seguro')renderSeg();
+}
+
+// ══════════ STATS ══════════
+function updStats(){
+  const t=insts.length,d=insts.filter(i=>i.status==='Disponível').length,
+    e=insts.filter(i=>i.status==='Emprestado').length,
+    m=insts.filter(i=>i.status==='Em Manutenção').length,
+    v=insts.reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
+  document.getElementById('st-tot').textContent=t;
+  document.getElementById('st-disp').textContent=d;
+  document.getElementById('st-emp').textContent=e;
+  document.getElementById('st-man').textContent=m;
+  document.getElementById('st-val').textContent='R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('st-ig').textContent=igrejas.length;
+  document.getElementById('b-tot').textContent=t;
+  document.getElementById('b-disp').textContent=d;
+  document.getElementById('b-emp').textContent=e;
+  document.getElementById('b-man').textContent=m;
+}
+
+// ══════════ DASHBOARD ══════════
+function renderDash(){
+  updStats();
+  const tp={};insts.forEach(i=>tp[i.nome]=(tp[i.nome]||0)+1);
+  const mxT=Math.max(...Object.values(tp),1);
+  document.getElementById('ch-tipo').innerHTML=Object.entries(tp).sort((a,b)=>b[1]-a[1])
+    .map(([k,v])=>`<div class="bar-row"><div class="bar-lbl">${k}</div><div class="bar-track"><div class="bar-fill" style="width:${v/mxT*100}%"></div></div><div class="bar-val">${v}</div></div>`).join('');
+  const sm={};insts.forEach(i=>sm[i.status]=(sm[i.status]||0)+1);
+  const sc={'Disponível':'#1a6e3f','Emprestado':'#b84f00','Em Manutenção':'#a05c00','Negociado':'#5c2d96','Finalidade':'#1a3f8a'};
+  const dd=Object.entries(sm),tot=dd.reduce((s,[,v])=>s+v,0);
+  const cv=document.getElementById('donut'),ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,108,108);let a=-Math.PI/2;
+  dd.forEach(([k,v])=>{const sl=(v/tot)*Math.PI*2;ctx.beginPath();ctx.moveTo(54,54);ctx.arc(54,54,46,a,a+sl);ctx.closePath();ctx.fillStyle=sc[k]||'#999';ctx.fill();a+=sl;});
+  ctx.beginPath();ctx.arc(54,54,26,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+  ctx.fillStyle='#18160f';ctx.font='bold 14px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(tot,54,54);
+  document.getElementById('donut-leg').innerHTML=dd.map(([k,v])=>
+    `<div class="donut-row"><div class="donut-dot" style="background:${sc[k]||'#999'}"></div><div class="donut-lbl">${k}</div><div class="donut-val">${v}</div></div>`).join('');
+  const lc={};insts.forEach(i=>lc[i.local_uso||i.igreja||'?']=(lc[i.local_uso||i.igreja||'?']||0)+1);
+  const mxL=Math.max(...Object.values(lc),1);
+  document.getElementById('ch-loc').innerHTML=Object.entries(lc).sort((a,b)=>b[1]-a[1])
+    .map(([k,v])=>`<div class="bar-row"><div class="bar-lbl" style="font-size:10.5px">${k}</div><div class="bar-track"><div class="bar-fill" style="width:${v/mxL*100}%"></div></div><div class="bar-val">${v}</div></div>`).join('');
+  const al=[];
+  insts.forEach(i=>{
+    if(!i.termo||i.termo.trim()===''||i.termo==='------------')
+      al.push({c:'var(--orange)',m:`<b>#${i.num} ${i.nome}</b> — Termo de doação pendente`});
+    if(i.obs&&i.obs.toLowerCase().includes('foto'))
+      al.push({c:'var(--blue)',m:`<b>#${i.num} ${i.nome}</b> — Foto pendente`});
+    if(i.status==='Negociado')
+      al.push({c:'var(--purple)',m:`<b>#${i.num} ${i.nome}</b> — Em negociação: ${i.resp}`});
+    if(i.status==='Em Manutenção')
+      al.push({c:'var(--yellow)',m:`<b>#${i.num} ${i.nome}</b> — Em manutenção`});
+    if(!i.valor||i.valor===0)
+      al.push({c:'var(--muted)',m:`<b>#${i.num} ${i.nome}</b> — Sem valor cadastrado (seguro)`});
+  });
+  const ae=document.getElementById('alertas');
+  ae.innerHTML=al.length
+    ?al.slice(0,12).map(a=>`<div class="alert-item"><div class="alert-dot" style="background:${a.c}"></div><span>${a.m}</span></div>`).join('')
+      +(al.length>12?`<div style="font-size:11px;color:var(--muted);padding-top:5px">+${al.length-12} alertas adicionais</div>`:'')
+    :`<div class="empty"><div class="ei">✓</div><div class="et">Sem pendências!</div></div>`;
+}
+
+// ══════════ FILTERS ══════════
+function fillFilters(){
+  const tipos=[...new Set(insts.map(i=>i.nome))].sort();
+  const locs=[...new Set(insts.map(i=>i.igreja||''))].filter(Boolean).sort();
+  const ft=document.getElementById('ftipo'),fg=document.getElementById('fig');
+  const pt=ft.value,pl=fg.value;
+  ft.innerHTML='<option value="">Todos os tipos</option>'+tipos.map(t=>`<option value="${t}" ${pt===t?'selected':''}>${t}</option>`).join('');
+  fg.innerHTML='<option value="">Todas as igrejas</option>'+locs.map(l=>`<option value="${l}" ${pl===l?'selected':''}>${l}</option>`).join('');
+}
+function getFiltered(){
+  const q=document.getElementById('fsearch').value.toLowerCase();
+  const tp=document.getElementById('ftipo').value;
+  const st=document.getElementById('fst').value;
+  const ig=document.getElementById('fig').value;
+  return insts.filter(i=>{
+    if(tp&&i.nome!==tp)return false;
+    if(st&&i.status!==st)return false;
+    if(ig&&i.igreja!==ig)return false;
+    if(q){const h=[i.nome,i.resp,i.cor,i.origem_doacao,i.marca,i.local_uso,i.igreja,i.modelo,i.termo,i.obs].join(' ').toLowerCase();if(!h.includes(q))return false;}
+    return true;
+  });
+}
+function srt(col){if(sCol===col)sDir*=-1;else{sCol=col;sDir=1;}renderTable();}
+function badge(s){
+  const m={'Disponível':'b-disp','Emprestado':'b-emp','Negociado':'b-neg','Finalidade':'b-fin','Em Manutenção':'b-man'};
+  return`<span class="badge ${m[s]||'b-disp'}">${s}</span>`;
+}
+function termoBadge(t){
+  if(!t||t.trim()===''||t==='------------')return`<span style="color:var(--red);font-size:10.5px;font-weight:700">⚠ Pendente</span>`;
+  return`<span style="color:var(--green);font-size:10.5px">✓ ${t}</span>`;
+}
+function fmtR(v){const n=parseFloat(v)||0;if(!n)return'<span style="color:var(--muted)">—</span>';return'R$ '+n.toLocaleString('pt-BR',{minimumFractionDigits:2});}
+
+function renderTable(){
+  let data=getFiltered();
+  data.sort((a,b)=>{let av=a[sCol]??'',bv=b[sCol]??'';if(typeof av==='number')return(av-bv)*sDir;return String(av).localeCompare(String(bv))*sDir;});
+  document.getElementById('tbl-cnt').textContent=`(${data.length} de ${insts.length})`;
+  const tb=document.getElementById('tbody');
+  if(!data.length){tb.innerHTML=`<tr><td colspan="13"><div class="empty"><div class="ei">♪</div><div class="et">Nenhum instrumento encontrado</div></div></td></tr>`;return;}
+  tb.innerHTML=data.map(i=>`
+    <tr onclick="openIM(${i.id})">
+      <td class="td-num">${i.num}</td>
+      <td class="td-bold">${i.nome}</td>
+      <td class="td-dim">${i.modelo||'—'}</td>
+      <td class="td-dim">${i.cor||'—'}</td>
+      <td class="td-dim" style="font-size:11.5px">${i.marca||'—'}</td>
+      <td class="td-dim" style="font-size:11.5px">${i.origem_doacao||'—'}</td>
+      <td style="font-size:12px">🏛 ${i.igreja||'—'}</td>
+      <td style="font-size:12px">📍 ${i.local_uso||'—'}</td>
+      <td>${termoBadge(i.termo)}</td>
+      <td class="td-money">${fmtR(i.valor)}</td>
+      <td>${badge(i.status)}</td>
+      <td style="font-weight:${i.resp?600:400};font-size:12px">${i.resp||'—'}</td>
+      <td onclick="event.stopPropagation()" style="text-align:center;white-space:nowrap">
+        <button class="btn btn-sm" onclick="openIM(${i.id})">✎</button>
+        <button class="btn btn-sm btn-danger" onclick="conf('instr',${i.id})">✕</button>
+      </td>
+    </tr>`).join('');
+}
+
+// ══════════ INSTRUMENTO MODAL ══════════
+function openIM(id){
+  eInst=id||null;
+  const i=id?insts.find(x=>x.id===id):null;
+  document.getElementById('mi-ico').textContent=i?`#${i.num}`:'♪';
+  document.getElementById('mi-title').textContent=i?`${i.nome} — Editar`:'Novo Instrumento';
+  document.getElementById('mi-sub').textContent=i?`${i.cor} · ${i.marca}`:'Preencha os campos abaixo';
+  ['num','nome','modelo','cor','marca','valor','local_uso','resp','origem_doacao','termo','obs'].forEach(f=>{
+    const el=document.getElementById('fi-'+f.replace('_doacao',''));
+    if(el)el.value=i?.[f]??'';
+  });
+  document.getElementById('fi-origem').value=i?.origem_doacao??'';
+  document.getElementById('fi-local').value=i?.local_uso??'';
+  const sel=document.getElementById('fi-igreja');
+  sel.innerHTML='<option value="">— Selecionar —</option>'+igrejas.map(g=>`<option value="${g.nome}" ${i?.igreja===g.nome?'selected':''}>${g.nome}</option>`).join('');
+  if(i?.status)document.getElementById('fi-status').value=i.status;
+  document.getElementById('ov-instr').classList.add('open');
+}
+function closeIM(){document.getElementById('ov-instr').classList.remove('open');eInst=null;}
+function saveI(){
+  const nome=document.getElementById('fi-nome').value.trim();
+  if(!nome){toast('Informe o nome do instrumento','err');return;}
+  const d={
+    num:parseInt(document.getElementById('fi-num').value)||0,
+    nome,modelo:document.getElementById('fi-modelo').value.trim(),
+    cor:document.getElementById('fi-cor').value.trim(),
+    marca:document.getElementById('fi-marca').value.trim(),
+    valor:parseFloat(document.getElementById('fi-valor').value)||0,
+    origem_doacao:document.getElementById('fi-origem').value.trim(),
+    igreja:document.getElementById('fi-igreja').value,
+    local_uso:document.getElementById('fi-local').value.trim(),
+    status:document.getElementById('fi-status').value,
+    resp:document.getElementById('fi-resp').value.trim(),
+    termo:document.getElementById('fi-termo').value.trim(),
+    obs:document.getElementById('fi-obs').value.trim(),
+  };
+  if(eInst){const idx=insts.findIndex(x=>x.id===eInst);insts[idx]={...insts[idx],...d};toast('Instrumento atualizado');}
+  else{d.id=Date.now();insts.push(d);toast('Instrumento cadastrado');}
+  sv();closeIM();updStats();fillFilters();renderTable();
+}
+
+// ══════════ IGREJAS ══════════
+function renderIG(){
+  const g=document.getElementById('igrejas-grid');
+  if(!igrejas.length){g.innerHTML=`<div class="empty"><div class="ei">⌂</div><div class="et">Nenhuma igreja cadastrada</div></div>`;return;}
+  g.innerHTML=igrejas.map(ig=>{
+    const ix=insts.filter(i=>i.igreja===ig.nome);
+    const d=ix.filter(i=>i.status==='Disponível').length,e=ix.filter(i=>i.status==='Emprestado').length;
+    const v=ix.reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
+    return`<div class="ig-card">
+      <div class="ig-hd"><span>🏛</span><div class="name">${ig.nome}</div><div class="cnt">${ix.length} instr.</div></div>
+      <div class="ig-body">
+        <div class="ig-row"><span class="ig-row-lbl">Cidade</span><span class="ig-row-val">${ig.cidade||'—'}</span></div>
+        <div class="ig-row"><span class="ig-row-lbl">Encarregado</span><span class="ig-row-val">${ig.enc||'—'}</span></div>
+        ${ig.tel?`<div class="ig-row"><span class="ig-row-lbl">Telefone</span><span class="ig-row-val">${ig.tel}</span></div>`:''}
+        <div class="ig-row"><span class="ig-row-lbl">Disponíveis</span><span class="ig-row-val" style="color:var(--green)">${d}</span></div>
+        <div class="ig-row"><span class="ig-row-lbl">Emprestados</span><span class="ig-row-val" style="color:var(--orange)">${e}</span></div>
+        <div class="ig-row"><span class="ig-row-lbl">Valor Inventário</span><span class="ig-row-val">R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>
+      </div>
+      <div class="ig-foot">
+        <button class="btn btn-sm" style="flex:1" onclick="openIM();document.getElementById('fi-igreja').value='${ig.nome}'">+ Instrumento</button>
+        <button class="btn btn-sm" onclick="openIG(${ig.id})">✎</button>
+        <button class="btn btn-sm btn-danger" onclick="conf('ig',${ig.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function openIG(id){
+  eIg=id||null;
+  const g=id?igrejas.find(x=>x.id===id):null;
+  document.getElementById('ig-title').textContent=g?'Editar Igreja':'Nova Igreja / Local';
+  ['nome','end','cidade','enc','tel','obs'].forEach(f=>document.getElementById('ig-'+f).value=g?.[f]??'');
+  document.getElementById('ov-ig').classList.add('open');
+}
+function closeIG(){document.getElementById('ov-ig').classList.remove('open');eIg=null;}
+function saveIG(){
+  const nome=document.getElementById('ig-nome').value.trim();
+  if(!nome){toast('Informe o nome','err');return;}
+  const d={nome,end:document.getElementById('ig-end').value.trim(),cidade:document.getElementById('ig-cidade').value.trim(),enc:document.getElementById('ig-enc').value.trim(),tel:document.getElementById('ig-tel').value.trim(),obs:document.getElementById('ig-obs').value.trim()};
+  if(eIg){const idx=igrejas.findIndex(x=>x.id===eIg);igrejas[idx]={...igrejas[idx],...d};toast('Igreja atualizada');}
+  else{d.id=Date.now();igrejas.push(d);toast('Igreja cadastrada');}
+  sv();closeIG();renderIG();updStats();
+}
+
+// ══════════ TERMOS ══════════
+function renderTR(){
+  const el=document.getElementById('termos-list');
+  if(!termos.length){el.innerHTML=`<div class="empty"><div class="ei">📂</div><div class="et">Nenhum termo cadastrado</div><div class="es">Cadastre links das pastas dos termos de doação</div></div>`;return;}
+  el.innerHTML=termos.map(t=>`
+    <div class="termo-item">
+      <div class="termo-ico">📂</div>
+      <div class="termo-info">
+        <div class="termo-name">${t.nome}</div>
+        ${t.ig?`<div class="termo-desc">📍 ${t.ig}${t.resp?' · Resp: '+t.resp:''}</div>`:''}
+        ${t.link?`<div class="termo-link"><a href="${t.link}" target="_blank">🔗 ${t.link}</a></div>`:'<div class="termo-desc" style="color:var(--red)">⚠ Sem link cadastrado</div>'}
+        ${t.obs?`<div class="termo-desc" style="font-style:italic;margin-top:2px">${t.obs}</div>`:''}
+      </div>
+      <div class="termo-acts">
+        ${t.link?`<a href="${t.link}" target="_blank" class="btn btn-sm btn-success">↗ Abrir</a>`:''}
+        <button class="btn btn-sm" onclick="openTR(${t.id})">✎</button>
+        <button class="btn btn-sm btn-danger" onclick="conf('tr',${t.id})">✕</button>
+      </div>
+    </div>`).join('');
+}
+function openTR(id){
+  eTr=id||null;
+  const t=id?termos.find(x=>x.id===id):null;
+  document.getElementById('tr-title').textContent=t?'Editar Termo':'Novo Termo de Doação';
+  ['nome','link','resp','obs'].forEach(f=>document.getElementById('tr-'+f).value=t?.[f]??'');
+  const sel=document.getElementById('tr-ig');
+  sel.innerHTML='<option value="">— Selecionar —</option>'+igrejas.map(g=>`<option value="${g.nome}" ${t?.ig===g.nome?'selected':''}>${g.nome}</option>`).join('');
+  document.getElementById('ov-tr').classList.add('open');
+}
+function closeTR(){document.getElementById('ov-tr').classList.remove('open');eTr=null;}
+function saveTR(){
+  const nome=document.getElementById('tr-nome').value.trim();
+  if(!nome){toast('Informe o nome','err');return;}
+  const d={nome,link:document.getElementById('tr-link').value.trim(),ig:document.getElementById('tr-ig').value,resp:document.getElementById('tr-resp').value.trim(),obs:document.getElementById('tr-obs').value.trim()};
+  if(eTr){const idx=termos.findIndex(x=>x.id===eTr);termos[idx]={...termos[idx],...d};toast('Termo atualizado');}
+  else{d.id=Date.now();termos.push(d);toast('Termo cadastrado');}
+  sv();closeTR();renderTR();
+}
+
+// ══════════ MOVIMENTAÇÃO ══════════
+function renderMV(){
+  const el=document.getElementById('mov-list');
+  if(!movs.length){el.innerHTML=`<div class="empty"><div class="ei">⇆</div><div class="et">Nenhuma movimentação registrada</div><div class="es">Registre transferências de instrumentos entre igrejas</div></div>`;return;}
+  el.innerHTML=[...movs].reverse().map(m=>{
+    const i=insts.find(x=>x.id===m.instrId);
+    return`<div class="mov-item">
+      <div class="mov-ico">⇆</div>
+      <div class="mov-info">
+        <div class="mov-title">${i?`#${i.num} ${i.nome}`:'Instrumento'} — ${m.orig||'?'} → ${m.dest}</div>
+        <div class="mov-sub">Resp: ${m.resp||'—'} · ${m.data||'—'}${m.obs?' · '+m.obs:''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+        <button class="btn btn-sm btn-gold" onclick="pdfDecl(${m.id})">📄 Declaração</button>
+        <button class="btn btn-sm btn-danger" onclick="conf('mv',${m.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function openMV(){
+  document.getElementById('mv-data').value=new Date().toISOString().slice(0,10);
+  const is=document.getElementById('mv-inst');
+  is.innerHTML='<option value="">— Selecionar —</option>'+insts.map(i=>`<option value="${i.id}">#${i.num} ${i.nome} (${i.local_uso||i.igreja||'?'})</option>`).join('');
+  ['mv-orig','mv-dest'].forEach(id=>{document.getElementById(id).innerHTML='<option value="">— Selecionar —</option>'+igrejas.map(g=>`<option value="${g.nome}">${g.nome}</option>`).join('');});
+  ['mv-resp','mv-obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ov-mv').classList.add('open');
+}
+function closeMV(){document.getElementById('ov-mv').classList.remove('open');}
+function saveMV(pdf){
+  const instrId=parseInt(document.getElementById('mv-inst').value);
+  const dest=document.getElementById('mv-dest').value;
+  if(!instrId||!dest){toast('Selecione o instrumento e o destino','err');return;}
+  const inst=insts.find(i=>i.id===instrId);
+  const m={id:Date.now(),instrId,orig:inst?.local_uso||inst?.igreja||document.getElementById('mv-orig').value,dest,data:document.getElementById('mv-data').value,resp:document.getElementById('mv-resp').value.trim(),obs:document.getElementById('mv-obs').value.trim()};
+  movs.push(m);
+  const idx=insts.findIndex(i=>i.id===instrId);
+  if(idx>=0){insts[idx].local_uso=dest;insts[idx].igreja=dest;}
+  sv();closeMV();renderMV();updStats();
+  toast('Movimentação registrada');
+  if(pdf)pdfDecl(m.id);
+}
+
+// ══════════ SEGURO ══════════
+function renderSeg(){
+  const tot=insts.reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
+  const cv=insts.filter(i=>i.valor>0).length,sv2=insts.filter(i=>!i.valor||i.valor===0).length;
+  document.getElementById('seg-banner').innerHTML=`
+    <div class="seg-item"><div class="seg-lbl">Valor Total do Acervo</div><div class="seg-val">R$ ${tot.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div class="seg-sub">base para cobertura do seguro</div></div>
+    <div class="seg-item"><div class="seg-lbl">Itens Valorados</div><div class="seg-val">${cv}</div><div class="seg-sub">de ${insts.length} instrumentos</div></div>
+    <div class="seg-item"><div class="seg-lbl">Sem Valor</div><div class="seg-val">${sv2}</div><div class="seg-sub">precisam de avaliação</div></div>
+    <div style="margin-left:auto;display:flex;align-items:center"><button class="btn" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff" onclick="expPDFSeguro()">📄 PDF Seguro</button></div>`;
+  document.getElementById('seg-body').innerHTML=[...insts].sort((a,b)=>(b.valor||0)-(a.valor||0)).map(i=>`
+    <tr>
+      <td class="td-num">${i.num}</td><td class="td-bold">${i.nome}</td><td class="td-dim">${i.modelo||'—'}</td>
+      <td class="td-dim">${i.cor||'—'}</td><td class="td-dim">${i.marca||'—'}</td>
+      <td class="td-dim" style="font-size:11.5px">${i.origem_doacao||'—'}</td>
+      <td style="font-size:12px">${i.igreja||'—'}</td><td style="font-size:12px">${i.local_uso||'—'}</td>
+      <td>${badge(i.status)}</td><td class="td-money">${fmtR(i.valor)}</td>
+    </tr>`).join('');
+}
+
+// ══════════ CONFIRM / DELETE ══════════
+function conf(tp,id){
+  const lbl={instr:'instrumento',ig:'igreja',tr:'termo',mv:'movimentação'};
+  document.getElementById('conf-title').textContent='Confirmar Exclusão';
+  document.getElementById('conf-msg').textContent=`Tem certeza que deseja remover este ${lbl[tp]||'item'}?`;
+  document.getElementById('ov-conf').classList.add('open');
+  document.getElementById('conf-ok').onclick=()=>{
+    if(tp==='instr')insts=insts.filter(x=>x.id!==id);
+    if(tp==='ig')igrejas=igrejas.filter(x=>x.id!==id);
+    if(tp==='tr')termos=termos.filter(x=>x.id!==id);
+    if(tp==='mv')movs=movs.filter(x=>x.id!==id);
+    sv();closeConf();
+    if(tp==='instr'){updStats();fillFilters();renderTable();}
+    if(tp==='ig')renderIG();
+    if(tp==='tr')renderTR();
+    if(tp==='mv')renderMV();
+    toast('Item removido');
+  };
+}
+function closeConf(){document.getElementById('ov-conf').classList.remove('open');}
+
+// ══════════ TOAST ══════════
+function toast(msg,tp='ok'){
+  const icons={ok:'✓',err:'✕',inf:'ℹ'};
+  const w=document.getElementById('toast-wrap');
+  const el=document.createElement('div');
+  el.className=`toast ${tp}`;
+  el.innerHTML=`<span class="tic">${icons[tp]||'✓'}</span>${msg}`;
+  w.appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);},3000);
+}
+
+// ══════════ EXPORT CSV ══════════
+function expCSV(){
+  const h=['Num','Instrumento','Tom','Cor','Marca','Origem/Doador','Igreja','Local Uso','Termo','Valor R$','Status','Responsável','Observações'];
+  const rows=insts.map(i=>[i.num,i.nome,i.modelo,i.cor,i.marca,i.origem_doacao,i.igreja,i.local_uso,i.termo,i.valor||0,i.status,i.resp,i.obs].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(','));
+  const csv=[h.join(','),...rows].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`instrumentos_ccb_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();toast('CSV exportado');
+}
+
+// ══════════ PDF LISTA ══════════
+function expPDFLista(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const data=getFiltered();
+  const hoje=new Date().toLocaleDateString('pt-BR');
+  doc.setFillColor(28,53,87);doc.rect(0,0,297,20,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(12);
+  doc.text('CCB ORQUESTRA — RELAÇÃO DE INSTRUMENTOS MUSICAIS',14,13);
+  doc.setFontSize(8);doc.text(`Emitido em: ${hoje}  |  Total: ${data.length} instrumentos`,220,13);
+  const hdr=['#','Instrumento','Tom','Cor','Marca','Origem/Doador','Igreja','Local Uso','Termo','Status','Responsável','Valor R$'];
+  const cw=[9,26,12,24,20,32,24,24,22,22,26,18];
+  let y=28,x=7;
+  doc.setFillColor(238,236,232);doc.rect(7,y-4,283,6,'F');
+  doc.setTextColor(80,80,80);doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+  hdr.forEach((h,i)=>{doc.text(h,x+1,y);x+=cw[i];});
+  y+=5;doc.setFont('helvetica','normal');doc.setTextColor(24,22,15);
+  data.forEach((row,ri)=>{
+    if(y>185){doc.addPage();doc.setFillColor(28,53,87);doc.rect(0,0,297,20,'F');y=28;}
+    if(ri%2===0){doc.setFillColor(247,246,241);doc.rect(7,y-3.5,283,5.5,'F');}
+    x=7;doc.setFontSize(6.5);
+    const cells=[String(row.num),row.nome,row.modelo||'—',row.cor||'—',row.marca||'—',row.origem_doacao||'—',row.igreja||'—',row.local_uso||'—',row.termo?'✓ '+row.termo:'⚠ Pendente',row.status,row.resp||'—',row.valor?(parseFloat(row.valor)).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'];
+    cells.forEach((c,i)=>{const t=doc.splitTextToSize(c,cw[i]-1.5)[0]||'';doc.text(t,x+1,y);x+=cw[i];});
+    y+=5.5;
+  });
+  const vtot=data.reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
+  y+=4;doc.setFillColor(28,53,87);doc.rect(7,y-4,283,6,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(7.5);
+  doc.text(`TOTAL: ${data.length} instrumentos  |  Valor total do acervo: R$ ${vtot.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,10,y);
+  doc.save(`relacao_instrumentos_${hoje.replace(/\//g,'-')}.pdf`);
+  toast('PDF exportado com sucesso','inf');
+}
+
+// ══════════ PDF SEGURO ══════════
+function expPDFSeguro(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const hoje=new Date().toLocaleDateString('pt-BR');
+  const tot=insts.reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
+  doc.setFillColor(28,53,87);doc.rect(0,0,210,28,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(14);
+  doc.text('CONGREGAÇÃO CRISTÃ NO BRASIL',105,11,{align:'center'});
+  doc.setFontSize(10);doc.text('INVENTÁRIO DE INSTRUMENTOS MUSICAIS PARA SEGURO',105,18,{align:'center'});
+  doc.setFontSize(7.5);doc.text(`Data: ${hoje}`,14,25);doc.text(`Valor Total: R$ ${tot.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,196,25,{align:'right'});
+  let y=36;
+  doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(9);
+  const intro='Este documento relaciona todos os instrumentos musicais pertencentes ao acervo da CCB Orquestra, com seus respectivos valores declarados para fins de cobertura de seguro patrimonial.';
+  doc.splitTextToSize(intro,182).forEach(ln=>{doc.text(ln,14,y);y+=5;});y+=5;
+  const h=['#','Instrumento','Tom','Cor','Marca','Origem/Doador','Igreja','Local','Status','R$'];
+  const cw=[9,28,12,26,22,28,22,20,20,23];
+  doc.setFillColor(238,236,232);doc.rect(7,y-4,196,6,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor(80,80,80);
+  let x=7;h.forEach((h2,i)=>{doc.text(h2,x+1,y);x+=cw[i];});y+=5;
+  doc.setFont('helvetica','normal');doc.setTextColor(24,22,15);
+  [...insts].sort((a,b)=>(b.valor||0)-(a.valor||0)).forEach((row,ri)=>{
+    if(y>272){doc.addPage();y=20;}
+    if(ri%2===0){doc.setFillColor(247,246,241);doc.rect(7,y-3.5,196,5.5,'F');}
+    x=7;doc.setFontSize(6.5);
+    const cells=[String(row.num),row.nome,row.modelo||'—',row.cor||'—',row.marca||'—',row.origem_doacao||'—',row.igreja||'—',row.local_uso||'—',row.status,row.valor?(parseFloat(row.valor)).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'];
+    cells.forEach((c,i)=>{const t=doc.splitTextToSize(c,cw[i]-1.5)[0]||'';doc.text(t,x+1,y);x+=cw[i];});y+=5.5;
+  });
+  y+=6;doc.setFillColor(28,53,87);doc.rect(7,y-4,196,6,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(8);
+  doc.text(`VALOR TOTAL DO ACERVO: R$ ${tot.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,10,y);
+  y+=18;doc.setTextColor(30,30,30);doc.setFont('helvetica','normal');doc.setFontSize(9);
+  doc.text('____________________________________',18,y);doc.text('____________________________________',118,y);
+  y+=5;doc.text('Responsável pelo Acervo',30,y);doc.text('Encarregado da Congregação',126,y);
+  doc.save(`inventario_seguro_${hoje.replace(/\//g,'-')}.pdf`);
+  toast('PDF do Seguro exportado','inf');
+}
+
+// ══════════ PDF DECLARAÇÃO ══════════
+function pdfDecl(movId){
+  const m=movs.find(x=>x.id===movId);
+  if(!m){toast('Movimentação não encontrada','err');return;}
+  const inst=insts.find(i=>i.id===m.instrId);
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const hoje=new Date().toLocaleDateString('pt-BR');
+  doc.setFillColor(28,53,87);doc.rect(0,0,210,32,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(15);
+  doc.text('CONGREGAÇÃO CRISTÃ NO BRASIL',105,12,{align:'center'});
+  doc.setFontSize(11);doc.text('DECLARAÇÃO DE TRANSPORTE DE INSTRUMENTO MUSICAL',105,20,{align:'center'});
+  doc.setFontSize(7.5);doc.setTextColor(200,210,230);doc.text(`Documento nº ${m.id} · Emitido em ${hoje}`,105,27,{align:'center'});
+  let y=44;
+  doc.setTextColor(24,22,15);doc.setFont('helvetica','normal');doc.setFontSize(10.5);
+  const txt=`Declaramos, para os devidos fins, que o instrumento musical abaixo identificado está sendo transportado da congregação de ${m.orig||'origem'} para a congregação de ${m.dest}, sob a responsabilidade do portador desta declaração, em conformidade com as diretrizes da administração da CCB Orquestra.`;
+  const lines=doc.splitTextToSize(txt,182);lines.forEach(l=>{doc.text(l,14,y);y+=5.5;});y+=5;
+  doc.setFillColor(234,239,247);doc.setDrawColor(28,53,87);doc.roundedRect(14,y,182,52,3,3,'FD');
+  y+=9;doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(28,53,87);
+  doc.text('IDENTIFICAÇÃO DO INSTRUMENTO',19,y);y+=7;
+  doc.setTextColor(24,22,15);doc.setFont('helvetica','normal');doc.setFontSize(10);
+  [
+    ['Instrumento:',inst?`${inst.nome} — Tom ${inst.modelo||'N/A'}`:'N/A'],
+    ['Número de Registro:',inst?`#${inst.num}`:'N/A'],
+    ['Cor / Descrição:',inst?.cor||'N/A'],
+    ['Marca / Modelo:',inst?.marca||'N/A'],
+    ['Origem / Doador:',inst?.origem_doacao||'N/A'],
+    ['Valor Declarado:',inst?.valor?`R$ ${parseFloat(inst.valor).toLocaleString('pt-BR',{minimumFractionDigits:2})}`:'Não informado'],
+  ].forEach(([l,v])=>{doc.setFont('helvetica','bold');doc.text(l,19,y);doc.setFont('helvetica','normal');doc.text(v,72,y);y+=6.5;});
+  y+=5;
+  doc.setFillColor(247,246,241);doc.setDrawColor(200,196,186);doc.roundedRect(14,y,182,42,3,3,'FD');
+  y+=9;doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(28,53,87);
+  doc.text('DADOS DA MOVIMENTAÇÃO',19,y);y+=7;
+  doc.setTextColor(24,22,15);
+  [['Congregação de Origem:',m.orig||'—'],['Congregação de Destino:',m.dest],['Data da Movimentação:',m.data||hoje],['Responsável pelo Transporte:',m.resp||'—']].forEach(([l,v])=>{
+    doc.setFont('helvetica','bold');doc.text(l,19,y);doc.setFont('helvetica','normal');doc.text(v,75,y);y+=6.5;
+  });
+  if(m.obs){y+=3;doc.setFontSize(9);doc.setTextColor(80,80,80);doc.text('Observações: '+m.obs,14,y);}
+  y+=12;
+  doc.setFontSize(9.5);doc.setTextColor(50,50,50);
+  doc.text('Este documento é válido como comprovante de autorização para o transporte do instrumento',105,y,{align:'center'});
+  doc.text('acima especificado, emitido pela CCB Orquestra.',105,y+5,{align:'center'});
+  y+=18;
+  doc.setFontSize(10);doc.setTextColor(24,22,15);
+  doc.text('____________________________________',22,y);doc.text('____________________________________',118,y);
+  y+=5;doc.setFontSize(8.5);
+  doc.text('Responsável pelo Transporte',34,y);doc.text('Encarregado da Congregação',126,y);
+  doc.text(m.resp||'',34,y+5);doc.text(m.dest,126,y+5);
+  doc.setFillColor(28,53,87);doc.rect(0,282,210,15,'F');
+  doc.setTextColor(180,195,220);doc.setFontSize(7);
+  doc.text('Congregação Cristã no Brasil — CCB Orquestra  |  Sistema de Gestão de Instrumentos Musicais',105,290,{align:'center'});
+  doc.save(`declaracao_transporte_${inst?.nome||'instrumento'}_${hoje.replace(/\//g,'-')}.pdf`);
+  toast('Declaração de transporte gerada!','inf');
+}
+
+// ══════════ BACKUP / RESTORE ══════════
+function expBackup(){
+  const backup={
+    versao:'2.1',
+    gerado:new Date().toISOString(),
+    gerado_fmt:new Date().toLocaleString('pt-BR'),
+    instrumentos:insts,igrejas,termos,movimentacoes:movs,
+    totais:{instrumentos:insts.length,igrejas:igrejas.length,termos:termos.length,movimentacoes:movs.length,valor_total:insts.reduce((s,i)=>s+(parseFloat(i.valor)||0),0)}
+  };
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
+  a.download=`backup_ccb_instrumentos_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  toast(`Backup exportado — ${insts.length} instrumentos, ${igrejas.length} igrejas, ${movs.length} movimentações`,'inf');
+}
+function impBackup(evt){
+  const file=evt.target.files[0];
+  if(!file){return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.instrumentos&&!data.igrejas){toast('Arquivo inválido — não é um backup CCB','err');evt.target.value='';return;}
+      const resumo=`Isso irá SUBSTITUIR todos os dados atuais.\n\nBackup contém:\n• ${(data.instrumentos||[]).length} instrumentos\n• ${(data.igrejas||[]).length} igrejas\n• ${(data.termos||[]).length} termos\n• ${(data.movimentacoes||[]).length} movimentações\n${data.gerado_fmt?'• Gerado em: '+data.gerado_fmt:''}\n\nDeseja continuar?`;
+      if(!confirm(resumo)){evt.target.value='';return;}
+      insts=data.instrumentos||[];
+      igrejas=data.igrejas||[];
+      termos=data.termos||[];
+      movs=data.movimentacoes||[];
+      sv();
+      updStats();fillFilters();renderDash();
+      const pg=document.querySelector('.page.active');
+      if(pg){
+        const id=pg.id.replace('page-','');
+        if(id==='instrumentos')renderTable();
+        if(id==='igrejas')renderIG();
+        if(id==='termos')renderTR();
+        if(id==='movimentacao')renderMV();
+        if(id==='seguro')renderSeg();
+      }
+      toast(`Backup restaurado — ${insts.length} instrumentos carregados`,'ok');
+    }catch(err){
+      toast('Erro ao ler backup: arquivo corrompido ou inválido','err');
+    }
+    evt.target.value='';
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
+// ══════════ KEYBOARD ══════════
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    ['ov-instr','ov-ig','ov-tr','ov-mv','ov-conf'].forEach(id=>document.getElementById(id).classList.remove('open'));
+  }
+});
+
+// ══════════ INICIAR ══════════
+init();
+</script>
+</body>
+</html>
