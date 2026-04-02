@@ -201,6 +201,8 @@ tbody td{padding:8px 10px;font-size:12.5px;color:var(--text);vertical-align:midd
 .b-emp{background:var(--orange-bg);color:var(--orange);border-color:#f0c099}
 .b-neg{background:var(--purple-bg);color:var(--purple);border-color:#c3aee8}
 .b-fin{background:var(--blue-bg);color:var(--blue);border-color:#afc3e8}
+.b-doado{background:#fce8f4;color:#8b1a6b;border-color:#e8aacc}
+.b-dest{background:#e8f4f8;color:#1a5f8b;border-color:#aacce8}
 .b-man{background:var(--yellow-bg);color:var(--yellow);border-color:#f0cc88}
 
 /* ── MODAL ── */
@@ -296,6 +298,44 @@ tbody td{padding:8px 10px;font-size:12.5px;color:var(--text);vertical-align:midd
 @keyframes spin{to{transform:rotate(360deg)}}
 
 @media print{.sidebar,.topbar,.filters,.modal,.toast-wrap,.btn{display:none!important}.main{margin-left:0!important}.content{padding:0!important}body{background:#fff!important}}
+
+/* ── MANUTENÇÃO ── */
+.man-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.man-item{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:12px 15px;display:flex;align-items:flex-start;gap:11px;box-shadow:var(--shadow);transition:border-color .14s}
+.man-item:hover{border-color:var(--navy)}
+.man-ico{width:36px;height:36px;border-radius:8px;background:var(--yellow-bg);border:1px solid #f0cc88;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.man-ico.done{background:var(--green-bg);border-color:#b0d9c2}
+.man-info{flex:1;min-width:0}
+.man-title{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.man-sub{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+.man-acts{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.tag-reparo{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:9.5px;font-weight:700;white-space:nowrap;border:1px solid transparent;margin-right:4px}
+.tag-andamento{background:var(--yellow-bg);color:var(--yellow);border-color:#f0cc88}
+.tag-concluido{background:var(--green-bg);color:var(--green);border-color:#b0d9c2}
+.tag-urgente{background:var(--red-bg);color:var(--red);border-color:#f0aaaa}
+
+/* ── ESTOQUE ── */
+.est-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.est-card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);transition:border-color .14s}
+.est-card:hover{border-color:var(--navy)}
+.est-card.low-stock{border-color:var(--red);border-left-width:3px}
+.est-hd{padding:11px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);background:var(--surf2)}
+.est-hd .est-ico{font-size:18px;flex-shrink:0}
+.est-hd .est-nome{font-weight:700;font-size:13px;flex:1;color:var(--navy)}
+.est-hd .est-cat{font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.est-body{padding:10px 14px}
+.est-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)}
+.est-row:last-child{border-bottom:none}
+.est-lbl{color:var(--muted)}
+.est-val{font-weight:700}
+.est-qty{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--navy);text-align:center;padding:6px 0 2px}
+.est-qty.low{color:var(--red)}
+.est-qty-lbl{font-size:9.5px;color:var(--muted);text-align:center;margin-bottom:8px}
+.est-foot{padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:5px}
+.est-adj{display:flex;align-items:center;gap:6px;background:var(--surf2);border-radius:7px;padding:4px 8px;flex:1}
+.est-adj button{background:var(--white);border:1px solid var(--border);border-radius:5px;width:24px;height:24px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .14s;font-weight:700;color:var(--navy)}
+.est-adj button:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+.est-adj .est-num{flex:1;text-align:center;font-weight:700;font-size:14px}
 </style>
 </head>
 <body>
@@ -331,9 +371,14 @@ tbody td{padding:8px 10px;font-size:12.5px;color:var(--text);vertical-align:midd
     <div class="sb-item" onclick="nav('instrumentos',this);setTimeout(()=>{fst.value='Disponível';renderTable()},50)"><span class="ic">✦</span>Disponíveis<span class="sb-badge" id="b-disp">0</span></div>
     <div class="sb-item" onclick="nav('instrumentos',this);setTimeout(()=>{fst.value='Emprestado';renderTable()},50)"><span class="ic">↗</span>Emprestados<span class="sb-badge" id="b-emp">0</span></div>
     <div class="sb-item" onclick="nav('instrumentos',this);setTimeout(()=>{fst.value='Em Manutenção';renderTable()},50)"><span class="ic">⚙</span>Manutenção<span class="sb-badge" id="b-man">0</span></div>
+    <div class="sb-item" onclick="nav('instrumentos',this);setTimeout(()=>{fst.value='Doado ao Músico';renderTable()},50)"><span class="ic">🎁</span>Destinados<span class="sb-badge" id="b-dest">0</span></div>
+    <div class="sb-section">Serviços & Estoque</div>
+    <div class="sb-item" onclick="nav('manutencao',this)"><span class="ic">🔧</span>Histórico Reparos<span class="sb-badge" id="b-man2">0</span></div>
+    <div class="sb-item" onclick="nav('manutencao',this);setTimeout(()=>{document.getElementById('fman-status').value='Concluído';renderMAN()},50)"><span class="ic">✔</span>Concluídos<span class="sb-badge" id="b-manconc">0</span></div>
+    <div class="sb-item" onclick="nav('estoque',this)"><span class="ic">📦</span>Estoque<span class="sb-badge" id="b-est">0</span></div>
   </nav>
   <div class="sb-foot" style="padding:10px 14px;text-align:center">
-  <div style="color:rgba(255,255,255,.28);font-size:9.5px;margin-bottom:8px">v2.1 Firebase · CCB Gestão · 2025</div>
+  <div style="color:rgba(255,255,255,.28);font-size:9.5px;margin-bottom:8px">v3.1 Firebase · CCB Gestão · 2025</div>
   <div style="color:rgba(255,255,255,.18);font-size:8.5px;margin-bottom:10px">Desenvolvido por<br><span style="color:rgba(255,255,255,.45);font-weight:600">Leandro Machado</span></div>
   <div style="display:flex;flex-direction:column;gap:5px">
     <button onclick="expBackup()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.8);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:600;transition:all .14s;display:flex;align-items:center;justify-content:center;gap:5px" onmouseover="this.style.background='rgba(255,255,255,.18)'" onmouseout="this.style.background='rgba(255,255,255,.1)'">⬇ Exportar Backup</button>
@@ -383,7 +428,7 @@ tbody td{padding:8px 10px;font-size:12.5px;color:var(--text);vertical-align:midd
         <select class="fsel" id="ftipo" onchange="renderTable()"><option value="">Todos os tipos</option></select>
         <select class="fsel" id="fst" onchange="renderTable()">
           <option value="">Todos os status</option>
-          <option>Disponível</option><option>Emprestado</option><option>Em Manutenção</option><option>Negociado</option><option>Finalidade</option>
+          <option>Disponível</option><option>Emprestado</option><option>Em Manutenção</option><option>Negociado</option><option>Finalidade</option><option>Doado ao Músico</option><option>Destinado</option>
         </select>
         <select class="fsel" id="fig" onchange="renderTable()"><option value="">Todas as igrejas</option></select>
         <button class="btn" onclick="window.print()">⎙ Imprimir</button>
@@ -447,6 +492,36 @@ tbody td{padding:8px 10px;font-size:12.5px;color:var(--text);vertical-align:midd
       </div>
     </div>
 
+    <!-- MANUTENÇÃO / REPAROS -->
+    <div class="page" id="page-manutencao">
+      <div class="man-stats" id="man-stats"></div>
+      <div class="sec-title">Histórico de Manutenções &amp; Reparos
+        <div style="display:flex;gap:7px">
+          <select class="fsel" id="fman-status" onchange="renderMAN()" style="font-size:11px">
+            <option value="">Todos</option><option>Em Andamento</option><option>Concluído</option><option>Urgente</option>
+          </select>
+          <button class="btn btn-primary" onclick="openMAN()">🔧 Novo Reparo</button>
+        </div>
+      </div>
+      <div id="man-list" style="display:flex;flex-direction:column;gap:9px"></div>
+    </div>
+
+    <!-- ESTOQUE -->
+    <div class="page" id="page-estoque">
+      <div class="stats-row" id="est-stats-row"></div>
+      <div class="sec-title">Estoque de Acessórios &amp; Materiais
+        <div style="display:flex;gap:7px">
+          <select class="fsel" id="fest-cat" onchange="renderEST()" style="font-size:11px">
+            <option value="">Todas as categorias</option>
+            <option>Cordas</option><option>Palhetas</option><option>Resina/Breu</option>
+            <option>Kit de Reparo</option><option>Acessórios</option><option>Limpeza</option><option>Outros</option>
+          </select>
+          <button class="btn btn-primary" onclick="openEST()">＋ Novo Item</button>
+        </div>
+      </div>
+      <div class="est-grid" id="est-grid"></div>
+    </div>
+
   </div>
 </div>
 
@@ -466,7 +541,7 @@ tbody td{padding:8px 10px;font-size:12.5px;color:var(--text);vertical-align:midd
         <div class="fg"><label class="fg-lbl">Igreja Responsável</label><select class="fs" id="fi-igreja"><option value="">— Selecionar —</option></select></div>
         <div class="fg"><label class="fg-lbl">Local de Uso Atual</label><input class="fi" id="fi-local" type="text" placeholder="Ex: Jardim Vitória, Serpa, Morro Grande"></div>
         <div class="fg"><label class="fg-lbl">Status</label>
-          <select class="fs" id="fi-status"><option>Disponível</option><option>Emprestado</option><option>Em Manutenção</option><option>Negociado</option><option>Finalidade</option></select>
+          <select class="fs" id="fi-status"><option>Disponível</option><option>Emprestado</option><option>Em Manutenção</option><option>Negociado</option><option>Finalidade</option><option>Doado ao Músico</option><option>Destinado</option></select>
         </div>
         <div class="fg"><label class="fg-lbl">Responsável (Está com:)</label><input class="fi" id="fi-resp" type="text" placeholder="Nome do responsável"></div>
         <div class="fg full"><label class="fg-lbl">Termo de Doação / Documento</label><input class="fi" id="fi-termo" type="text" placeholder="Ex: Termo Assinado, Nota Fiscal 47913, Ordem Serviço 2937"></div>
@@ -534,6 +609,69 @@ tbody td{padding:8px 10px;font-size:12.5px;color:var(--text);vertical-align:midd
   </div>
 </div>
 
+<!-- MODAL MANUTENÇÃO -->
+<div class="overlay" id="ov-man" onclick="if(event.target===this)closeMAN()">
+  <div class="modal modal-w640">
+    <div class="m-head"><div class="m-icon">🔧</div><div><div class="m-title" id="man-title">Novo Registro de Reparo</div><div class="m-sub" id="man-sub">Preencha os dados do serviço</div></div><button class="m-close" onclick="closeMAN()">✕</button></div>
+    <div class="m-body">
+      <div class="fgrid">
+        <div class="fg full"><label class="fg-lbl">Instrumento *</label><select class="fs" id="man-inst"><option value="">— Selecionar instrumento —</option></select></div>
+        <div class="fg"><label class="fg-lbl">Tipo de Reparo *</label>
+          <select class="fs" id="man-tipo">
+            <option value="">— Selecionar —</option>
+            <option>Regulagem</option><option>Troca de Corda</option><option>Troca de Palheta</option>
+            <option>Limpeza Completa</option><option>Reforma/Restauração</option><option>Soldagem</option>
+            <option>Ajuste de Mecânica</option><option>Verniz / Acabamento</option><option>Reparo de Chave</option>
+            <option>Troca de Pele</option><option>Outro</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fg-lbl">Status do Reparo</label>
+          <select class="fs" id="man-status">
+            <option>Em Andamento</option><option>Concluído</option><option>Urgente</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fg-lbl">Quem Levou para Arrumar *</label><input class="fi" id="man-levou" type="text" placeholder="Nome do irmão responsável"></div>
+        <div class="fg"><label class="fg-lbl">Técnico / Luthier Responsável</label><input class="fi" id="man-tecnico" type="text" placeholder="Nome do técnico ou oficina"></div>
+        <div class="fg"><label class="fg-lbl">Data de Entrega (Levado)</label><input class="fi" id="man-data-ent" type="date"></div>
+        <div class="fg"><label class="fg-lbl">Data de Conclusão (Retirada)</label><input class="fi" id="man-data-conc" type="date"></div>
+        <div class="fg"><label class="fg-lbl">Custo do Reparo R$</label><div class="ip"><span>R$</span><input class="fi" id="man-custo" type="number" step="0.01" placeholder="0,00"></div></div>
+        <div class="fg full"><label class="fg-lbl">Descrição do Problema / Serviço Realizado</label><textarea class="ft" id="man-obs" placeholder="Descreva o problema encontrado e o serviço realizado..."></textarea></div>
+      </div>
+    </div>
+    <div class="m-footer"><button class="btn" onclick="closeMAN()">Cancelar</button><button class="btn btn-primary" onclick="saveMAN()">💾 Salvar Reparo</button></div>
+  </div>
+</div>
+
+<!-- MODAL ESTOQUE -->
+<div class="overlay" id="ov-est" onclick="if(event.target===this)closeEST()">
+  <div class="modal modal-w500">
+    <div class="m-head"><div class="m-icon">📦</div><div><div class="m-title" id="est-title">Novo Item de Estoque</div><div class="m-sub">Cadastro de material ou acessório</div></div><button class="m-close" onclick="closeEST()">✕</button></div>
+    <div class="m-body">
+      <div class="fgrid">
+        <div class="fg full"><label class="fg-lbl">Nome do Item *</label><input class="fi" id="est-nome" type="text" placeholder="Ex: Corda Mi Violino, Palheta Sib Clarineta"></div>
+        <div class="fg"><label class="fg-lbl">Categoria *</label>
+          <select class="fs" id="est-cat">
+            <option>Cordas</option><option>Palhetas</option><option>Resina/Breu</option>
+            <option>Kit de Reparo</option><option>Acessórios</option><option>Limpeza</option><option>Outros</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fg-lbl">Ícone (emoji)</label><input class="fi" id="est-ico" type="text" placeholder="🎻" maxlength="4" style="font-size:18px"></div>
+        <div class="fg"><label class="fg-lbl">Quantidade Atual *</label><input class="fi" id="est-qtd" type="number" min="0" placeholder="0"></div>
+        <div class="fg"><label class="fg-lbl">Estoque Mínimo (alerta)</label><input class="fi" id="est-min" type="number" min="0" placeholder="Ex: 5"></div>
+        <div class="fg"><label class="fg-lbl">Unidade</label>
+          <select class="fs" id="est-unid">
+            <option>unid.</option><option>par</option><option>jogo</option><option>caixa</option><option>pct.</option><option>kit</option>
+          </select>
+        </div>
+        <div class="fg full"><label class="fg-lbl">Fornecedor / Onde Comprar</label><input class="fi" id="est-forn" type="text" placeholder="Ex: Phx Instrumentos, Servitec, Amazon"></div>
+        <div class="fg"><label class="fg-lbl">Preço Unitário R$</label><div class="ip"><span>R$</span><input class="fi" id="est-preco" type="number" step="0.01" placeholder="0,00"></div></div>
+        <div class="fg full"><label class="fg-lbl">Observações</label><textarea class="ft" id="est-obs" placeholder="Compatibilidade, notas de uso, etc."></textarea></div>
+      </div>
+    </div>
+    <div class="m-footer"><button class="btn" onclick="closeEST()">Cancelar</button><button class="btn btn-primary" onclick="saveEST()">💾 Salvar Item</button></div>
+  </div>
+</div>
+
 <!-- CONFIRM -->
 <div class="overlay" id="ov-conf">
   <div class="confirm-modal">
@@ -587,8 +725,8 @@ const INST0=[
 ];
 
 // ══════════ ESTADO ══════════
-let insts=[],igrejas=[],termos=[],movs=[];
-let eInst=null,eIg=null,eTr=null;
+let insts=[],igrejas=[],termos=[],movs=[],manutencoes=[],estoque=[];
+let eInst=null,eIg=null,eTr=null,eMan=null,eEst=null;
 let sCol='num',sDir=1;
 let _fbReady=false;       // Firebase inicializado
 let _pendingSync=false;   // Há dados locais aguardando sync
@@ -610,7 +748,9 @@ function svLocal(){
   localStorage.setItem('ccb_g',JSON.stringify(igrejas));
   localStorage.setItem('ccb_t',JSON.stringify(termos));
   localStorage.setItem('ccb_m',JSON.stringify(movs));
-  localStorage.setItem('ccb_pending','1');  // marca pendência
+  localStorage.setItem('ccb_mn',JSON.stringify(manutencoes));
+  localStorage.setItem('ccb_es',JSON.stringify(estoque));
+  localStorage.setItem('ccb_pending','1');
   _pendingSync=true;
 }
 function ldLocal(){
@@ -618,6 +758,8 @@ function ldLocal(){
   igrejas=JSON.parse(localStorage.getItem('ccb_g')||'null')||JSON.parse(JSON.stringify(IGREJAS0));
   termos=JSON.parse(localStorage.getItem('ccb_t')||'[]');
   movs=JSON.parse(localStorage.getItem('ccb_m')||'[]');
+  manutencoes=JSON.parse(localStorage.getItem('ccb_mn')||'[]');
+  estoque=JSON.parse(localStorage.getItem('ccb_es')||'[]');
   _pendingSync=localStorage.getItem('ccb_pending')==='1';
 }
 function clearPending(){
@@ -635,6 +777,8 @@ async function svFirebase(){
       window._fb.saveCollection('igrejas',igrejas),
       window._fb.saveCollection('termos',termos),
       window._fb.saveCollection('movimentacoes',movs),
+      window._fb.saveCollection('manutencoes',manutencoes),
+      window._fb.saveCollection('estoque',estoque),
     ]);
     clearPending();
     // Atualiza localStorage também como cache
@@ -642,6 +786,8 @@ async function svFirebase(){
     localStorage.setItem('ccb_g',JSON.stringify(igrejas));
     localStorage.setItem('ccb_t',JSON.stringify(termos));
     localStorage.setItem('ccb_m',JSON.stringify(movs));
+    localStorage.setItem('ccb_mn',JSON.stringify(manutencoes));
+    localStorage.setItem('ccb_es',JSON.stringify(estoque));
     setStatus('online','Online · Firebase ✓');
     return true;
   }catch(e){
@@ -654,22 +800,26 @@ async function svFirebase(){
 async function ldFirebase(){
   if(!_fbReady||!navigator.onLine)return false;
   try{
-    const [fi,fg,ft,fm]=await Promise.all([
+    const [fi,fg,ft,fm,fmn,fes]=await Promise.all([
       window._fb.loadCollection('instrumentos'),
       window._fb.loadCollection('igrejas'),
       window._fb.loadCollection('termos'),
       window._fb.loadCollection('movimentacoes'),
+      window._fb.loadCollection('manutencoes'),
+      window._fb.loadCollection('estoque'),
     ]);
-    // Só substitui se o Firebase tiver dados
     if(fi&&fi.length>0)insts=fi;
     if(fg&&fg.length>0)igrejas=fg;
     if(ft)termos=ft;
     if(fm)movs=fm;
-    // Salva como cache local
+    if(fmn)manutencoes=fmn;
+    if(fes)estoque=fes;
     localStorage.setItem('ccb_i',JSON.stringify(insts));
     localStorage.setItem('ccb_g',JSON.stringify(igrejas));
     localStorage.setItem('ccb_t',JSON.stringify(termos));
     localStorage.setItem('ccb_m',JSON.stringify(movs));
+    localStorage.setItem('ccb_mn',JSON.stringify(manutencoes));
+    localStorage.setItem('ccb_es',JSON.stringify(estoque));
     clearPending();
     return true;
   }catch(e){
@@ -751,7 +901,8 @@ function nav(p,el){
   document.getElementById('page-'+p).classList.add('active');
   if(el)el.classList.add('active');
   const T={dashboard:'Dashboard',instrumentos:'Instrumentos',igrejas:'Igrejas / Locais',
-    termos:'Termos de Doação',movimentacao:'Movimentação',seguro:'Inventário / Seguro'};
+    termos:'Termos de Doação',movimentacao:'Movimentação',seguro:'Inventário / Seguro',
+    manutencao:'Histórico de Manutenções',estoque:'Estoque de Acessórios'};
   document.getElementById('page-title').textContent=T[p]||p;
   if(p==='dashboard')renderDash();
   if(p==='instrumentos'){fillFilters();renderTable();}
@@ -759,6 +910,8 @@ function nav(p,el){
   if(p==='termos')renderTR();
   if(p==='movimentacao')renderMV();
   if(p==='seguro')renderSeg();
+  if(p==='manutencao')renderMAN();
+  if(p==='estoque')renderEST();
 }
 
 // ══════════ STATS ══════════
@@ -766,7 +919,9 @@ function updStats(){
   const t=insts.length,d=insts.filter(i=>i.status==='Disponível').length,
     e=insts.filter(i=>i.status==='Emprestado').length,
     m=insts.filter(i=>i.status==='Em Manutenção').length,
+    dest=insts.filter(i=>i.status==='Doado ao Músico'||i.status==='Destinado').length,
     v=insts.reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
+  const manConc=manutencoes.filter(x=>x.status==='Concluído').length;
   document.getElementById('st-tot').textContent=t;
   document.getElementById('st-disp').textContent=d;
   document.getElementById('st-emp').textContent=e;
@@ -777,6 +932,11 @@ function updStats(){
   document.getElementById('b-disp').textContent=d;
   document.getElementById('b-emp').textContent=e;
   document.getElementById('b-man').textContent=m;
+  document.getElementById('b-dest').textContent=dest;
+  document.getElementById('b-man2').textContent=manutencoes.length;
+  document.getElementById('b-manconc').textContent=manConc;
+  const estLow=estoque.filter(x=>x.qtd<=x.min).length;
+  document.getElementById('b-est').textContent=estLow>0?estLow+'!':estoque.length;
 }
 
 // ══════════ DASHBOARD ══════════
@@ -787,7 +947,7 @@ function renderDash(){
   document.getElementById('ch-tipo').innerHTML=Object.entries(tp).sort((a,b)=>b[1]-a[1])
     .map(([k,v])=>`<div class="bar-row"><div class="bar-lbl">${k}</div><div class="bar-track"><div class="bar-fill" style="width:${v/mxT*100}%"></div></div><div class="bar-val">${v}</div></div>`).join('');
   const sm={};insts.forEach(i=>sm[i.status]=(sm[i.status]||0)+1);
-  const sc={'Disponível':'#1a6e3f','Emprestado':'#b84f00','Em Manutenção':'#a05c00','Negociado':'#5c2d96','Finalidade':'#1a3f8a'};
+  const sc={'Disponível':'#1a6e3f','Emprestado':'#b84f00','Em Manutenção':'#a05c00','Negociado':'#5c2d96','Finalidade':'#1a3f8a','Doado ao Músico':'#8b1a6b','Destinado':'#1a5f8b'};
   const dd=Object.entries(sm),tot=dd.reduce((s,[,v])=>s+v,0);
   const cv=document.getElementById('donut'),ctx=cv.getContext('2d');
   ctx.clearRect(0,0,108,108);let a=-Math.PI/2;
@@ -810,6 +970,18 @@ function renderDash(){
       al.push({c:'var(--purple)',m:`<b>#${i.num} ${i.nome}</b> — Em negociação: ${i.resp}`});
     if(i.status==='Em Manutenção')
       al.push({c:'var(--yellow)',m:`<b>#${i.num} ${i.nome}</b> — Em manutenção`});
+  });
+  // Alertas de estoque baixo
+  estoque.filter(x=>x.qtd<=x.min).forEach(x=>{
+    al.push({c:'var(--red)',m:`<b>📦 Estoque baixo:</b> ${x.nome} — ${x.qtd} ${x.unid||'unid.'} restantes`});
+  });
+  // Manutenções em andamento
+  manutencoes.filter(x=>x.status==='Em Andamento'||x.status==='Urgente').forEach(m=>{
+    const inst=insts.find(i=>i.id===m.instrId);
+    al.push({c:m.status==='Urgente'?'var(--red)':'var(--yellow)',m:`<b>🔧 ${m.status}:</b> ${inst?inst.nome:'?'} — ${m.tipo}${m.tecnico?' · Técnico: '+m.tecnico:''}`});
+  });
+  // Sem valor para seguro
+  insts.forEach(i=>{
     if(!i.valor||i.valor===0)
       al.push({c:'var(--muted)',m:`<b>#${i.num} ${i.nome}</b> — Sem valor cadastrado (seguro)`});
   });
@@ -844,7 +1016,7 @@ function getFiltered(){
 }
 function srt(col){if(sCol===col)sDir*=-1;else{sCol=col;sDir=1;}renderTable();}
 function badge(s){
-  const m={'Disponível':'b-disp','Emprestado':'b-emp','Negociado':'b-neg','Finalidade':'b-fin','Em Manutenção':'b-man'};
+  const m={'Disponível':'b-disp','Emprestado':'b-emp','Negociado':'b-neg','Finalidade':'b-fin','Em Manutenção':'b-man','Doado ao Músico':'b-doado','Destinado':'b-dest'};
   return`<span class="badge ${m[s]||'b-disp'}">${s}</span>`;
 }
 function termoBadge(t){
@@ -928,6 +1100,7 @@ function renderIG(){
   g.innerHTML=igrejas.map(ig=>{
     const ix=insts.filter(i=>i.igreja===ig.nome);
     const d=ix.filter(i=>i.status==='Disponível').length,e=ix.filter(i=>i.status==='Emprestado').length;
+    const dest=ix.filter(i=>i.status==='Doado ao Músico'||i.status==='Destinado').length;
     const v=ix.reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
     return`<div class="ig-card">
       <div class="ig-hd"><span>🏛</span><div class="name">${ig.nome}</div><div class="cnt">${ix.length} instr.</div></div>
@@ -937,6 +1110,7 @@ function renderIG(){
         ${ig.tel?`<div class="ig-row"><span class="ig-row-lbl">Telefone</span><span class="ig-row-val">${ig.tel}</span></div>`:''}
         <div class="ig-row"><span class="ig-row-lbl">Disponíveis</span><span class="ig-row-val" style="color:var(--green)">${d}</span></div>
         <div class="ig-row"><span class="ig-row-lbl">Emprestados</span><span class="ig-row-val" style="color:var(--orange)">${e}</span></div>
+        ${dest>0?`<div class="ig-row"><span class="ig-row-lbl">Destinados</span><span class="ig-row-val" style="color:#8b1a6b">${dest}</span></div>`:''}
         <div class="ig-row"><span class="ig-row-lbl">Valor Inventário</span><span class="ig-row-val">R$ ${v.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>
       </div>
       <div class="ig-foot">
@@ -1066,7 +1240,7 @@ function renderSeg(){
 
 // ══════════ CONFIRM / DELETE ══════════
 function conf(tp,id){
-  const lbl={instr:'instrumento',ig:'igreja',tr:'termo',mv:'movimentação'};
+  const lbl={instr:'instrumento',ig:'igreja',tr:'termo',mv:'movimentação',man:'registro de reparo',est:'item de estoque'};
   document.getElementById('conf-title').textContent='Confirmar Exclusão';
   document.getElementById('conf-msg').textContent=`Tem certeza que deseja remover este ${lbl[tp]||'item'}?`;
   document.getElementById('ov-conf').classList.add('open');
@@ -1075,11 +1249,15 @@ function conf(tp,id){
     if(tp==='ig')igrejas=igrejas.filter(x=>x.id!==id);
     if(tp==='tr')termos=termos.filter(x=>x.id!==id);
     if(tp==='mv')movs=movs.filter(x=>x.id!==id);
+    if(tp==='man')manutencoes=manutencoes.filter(x=>x.id!==id);
+    if(tp==='est')estoque=estoque.filter(x=>x.id!==id);
     sv();closeConf();
     if(tp==='instr'){updStats();fillFilters();renderTable();}
     if(tp==='ig')renderIG();
     if(tp==='tr')renderTR();
     if(tp==='mv')renderMV();
+    if(tp==='man'){renderMAN();updStats();}
+    if(tp==='est'){renderEST();updStats();}
     toast('Item removido');
   };
 }
@@ -1113,31 +1291,145 @@ function expPDFLista(){
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const data=getFiltered();
   const hoje=new Date().toLocaleDateString('pt-BR');
+
+  // ── Cabeçalho principal ──
   doc.setFillColor(28,53,87);doc.rect(0,0,297,20,'F');
   doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(12);
   doc.text('CCB ORQUESTRA — RELAÇÃO DE INSTRUMENTOS MUSICAIS',14,13);
   doc.setFontSize(8);doc.text(`Emitido em: ${hoje}  |  Total: ${data.length} instrumentos`,220,13);
+
+  // ── Tabela principal ──
+  // Colunas: #, Instrumento, Tom, Cor, Marca, Origem/Doador, Igreja, Local Uso, Termo, Status, Responsável, Valor R$
   const hdr=['#','Instrumento','Tom','Cor','Marca','Origem/Doador','Igreja','Local Uso','Termo','Status','Responsável','Valor R$'];
-  const cw=[9,26,12,24,20,32,24,24,22,22,26,18];
+  const cw=[8,28,12,22,18,34,26,24,28,22,26,18];// soma=266, total disponível~283
   let y=28,x=7;
   doc.setFillColor(238,236,232);doc.rect(7,y-4,283,6,'F');
   doc.setTextColor(80,80,80);doc.setFont('helvetica','bold');doc.setFontSize(6.5);
   hdr.forEach((h,i)=>{doc.text(h,x+1,y);x+=cw[i];});
   y+=5;doc.setFont('helvetica','normal');doc.setTextColor(24,22,15);
+
   data.forEach((row,ri)=>{
-    if(y>185){doc.addPage();doc.setFillColor(28,53,87);doc.rect(0,0,297,20,'F');y=28;}
+    if(y>185){
+      doc.addPage();
+      doc.setFillColor(28,53,87);doc.rect(0,0,297,20,'F');
+      doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(9);
+      doc.text('CCB ORQUESTRA — RELAÇÃO DE INSTRUMENTOS MUSICAIS (continuação)',14,13);
+      doc.setTextColor(24,22,15);doc.setFont('helvetica','normal');
+      y=28;
+      doc.setFillColor(238,236,232);doc.rect(7,y-4,283,6,'F');
+      doc.setTextColor(80,80,80);doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+      x=7;hdr.forEach((h,i)=>{doc.text(h,x+1,y);x+=cw[i];});
+      y+=5;doc.setFont('helvetica','normal');doc.setTextColor(24,22,15);
+    }
     if(ri%2===0){doc.setFillColor(247,246,241);doc.rect(7,y-3.5,283,5.5,'F');}
     x=7;doc.setFontSize(6.5);
-    const cells=[String(row.num),row.nome,row.modelo||'—',row.cor||'—',row.marca||'—',row.origem_doacao||'—',row.igreja||'—',row.local_uso||'—',row.termo?'✓ '+row.termo:'⚠ Pendente',row.status,row.resp||'—',row.valor?(parseFloat(row.valor)).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'];
-    cells.forEach((c,i)=>{const t=doc.splitTextToSize(c,cw[i]-1.5)[0]||'';doc.text(t,x+1,y);x+=cw[i];});
+    const termo=row.termo&&row.termo.trim()&&row.termo!=='------------'?row.termo:'⚠ Pendente';
+    const cells=[
+      String(row.num||''),
+      row.nome||'—',
+      row.modelo||'—',
+      row.cor||'—',
+      row.marca||'—',
+      row.origem_doacao||'—',
+      row.igreja||'—',
+      row.local_uso||'—',
+      termo,
+      row.status||'—',
+      row.resp||'—',
+      row.valor?parseFloat(row.valor).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'
+    ];
+    cells.forEach((c,i)=>{
+      const t=doc.splitTextToSize(String(c),cw[i]-1.5)[0]||'';
+      doc.text(t,x+1,y);x+=cw[i];
+    });
     y+=5.5;
   });
+
+  // ── Rodapé com total ──
   const vtot=data.reduce((s,i)=>s+(parseFloat(i.valor)||0),0);
-  y+=4;doc.setFillColor(28,53,87);doc.rect(7,y-4,283,6,'F');
+  y+=4;
+  if(y>190){doc.addPage();y=20;}
+  doc.setFillColor(28,53,87);doc.rect(7,y-4,283,6,'F');
   doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(7.5);
   doc.text(`TOTAL: ${data.length} instrumentos  |  Valor total do acervo: R$ ${vtot.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,10,y);
+
+  // ══ ANEXO A — Ciência para utilização ══
+  doc.addPage();
+  // Cabeçalho Anexo A
+  doc.setFillColor(28,53,87);doc.rect(0,0,297,18,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(10);
+  doc.text('ANEXO A — VISTO AO TERMO DE CIÊNCIA PARA UTILIZAÇÃO DOS INSTRUMENTOS DA CCB',148,12,{align:'center'});
+  doc.setFontSize(7);doc.text(`Emitido em: ${hoje}  |  Total: ${data.length} instrumentos`,14,16.5);
+
+  // Tabela do Anexo A
+  const hdrA=['Qtd','Nome','Modelo','Cor','Origem','Localidade','Marca','Está com:','Responsável','Testemunha','Data'];
+  const cwA=[10,26,16,24,30,24,20,26,30,30,24];// soma=260
+  let yA=26,xA=7;
+  doc.setFillColor(238,236,232);doc.rect(7,yA-4,283,6,'F');
+  doc.setTextColor(28,53,87);doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+  hdrA.forEach((h,i)=>{doc.text(h,xA+1,yA);xA+=cwA[i];});
+  yA+=5;doc.setFont('helvetica','normal');doc.setTextColor(24,22,15);
+
+  // Filtra apenas instrumentos emprestados/destinados (com responsável)
+  const dataA=data.filter(r=>r.resp&&r.resp.trim());
+  dataA.forEach((row,ri)=>{
+    if(yA>192){
+      doc.addPage();
+      doc.setFillColor(28,53,87);doc.rect(0,0,297,18,'F');
+      doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(9);
+      doc.text('ANEXO A (continuação)',148,12,{align:'center'});
+      doc.setTextColor(24,22,15);doc.setFont('helvetica','normal');
+      yA=26;
+      doc.setFillColor(238,236,232);doc.rect(7,yA-4,283,6,'F');
+      doc.setTextColor(28,53,87);doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+      xA=7;hdrA.forEach((h,i)=>{doc.text(h,xA+1,yA);xA+=cwA[i];});
+      yA+=5;doc.setFont('helvetica','normal');doc.setTextColor(24,22,15);
+    }
+    // Linha zebrada
+    if(ri%2===0){doc.setFillColor(247,246,241);doc.rect(7,yA-3.5,283,5.5,'F');}
+
+    // Colunas de assinatura — borda visível
+    // Responsável col
+    const respColX=7+cwA[0]+cwA[1]+cwA[2]+cwA[3]+cwA[4]+cwA[5]+cwA[6]+cwA[7];
+    const respColW=cwA[8];
+    const testColX=respColX+respColW;
+    const testColW=cwA[9];
+    const dataColX=testColX+testColW;
+    const dataColW=cwA[10];
+    doc.setDrawColor(180,180,180);
+    doc.rect(respColX,yA-3.5,respColW,5.5);
+    doc.rect(testColX,yA-3.5,testColW,5.5);
+    doc.rect(dataColX,yA-3.5,dataColW,5.5);
+
+    xA=7;doc.setFontSize(6.5);doc.setDrawColor(200,196,186);
+    const cellsA=[
+      '1',
+      row.nome||'—',
+      row.modelo||'—',
+      row.cor||'—',
+      row.origem_doacao||'—',
+      row.local_uso||'—',
+      row.marca||'—',
+      row.resp||'—',
+      '',// Responsável (assinatura)
+      '',// Testemunha (assinatura)
+      '',// Data (assinatura)
+    ];
+    cellsA.forEach((c,i)=>{
+      const t=doc.splitTextToSize(String(c),cwA[i]-1.5)[0]||'';
+      doc.text(t,xA+1,yA);xA+=cwA[i];
+    });
+    yA+=5.5;
+  });
+
+  // Rodapé Anexo A
+  if(dataA.length===0){
+    doc.setTextColor(120,120,120);doc.setFontSize(9);
+    doc.text('Nenhum instrumento com responsável cadastrado.',148,60,{align:'center'});
+  }
+
   doc.save(`relacao_instrumentos_${hoje.replace(/\//g,'-')}.pdf`);
-  toast('PDF exportado com sucesso','inf');
+  toast('PDF exportado com sucesso — inclui Anexo A','inf');
 }
 
 // ══════════ PDF SEGURO ══════════
@@ -1236,11 +1528,14 @@ function pdfDecl(movId){
 // ══════════ BACKUP / RESTORE ══════════
 function expBackup(){
   const backup={
-    versao:'2.1',
+    versao:'3.0',
     gerado:new Date().toISOString(),
     gerado_fmt:new Date().toLocaleString('pt-BR'),
     instrumentos:insts,igrejas,termos,movimentacoes:movs,
-    totais:{instrumentos:insts.length,igrejas:igrejas.length,termos:termos.length,movimentacoes:movs.length,valor_total:insts.reduce((s,i)=>s+(parseFloat(i.valor)||0),0)}
+    manutencoes,estoque,
+    totais:{instrumentos:insts.length,igrejas:igrejas.length,termos:termos.length,movimentacoes:movs.length,
+      manutencoes:manutencoes.length,estoque:estoque.length,
+      valor_total:insts.reduce((s,i)=>s+(parseFloat(i.valor)||0),0)}
   };
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
@@ -1256,12 +1551,14 @@ function impBackup(evt){
     try{
       const data=JSON.parse(e.target.result);
       if(!data.instrumentos&&!data.igrejas){toast('Arquivo inválido — não é um backup CCB','err');evt.target.value='';return;}
-      const resumo=`Isso irá SUBSTITUIR todos os dados atuais.\n\nBackup contém:\n• ${(data.instrumentos||[]).length} instrumentos\n• ${(data.igrejas||[]).length} igrejas\n• ${(data.termos||[]).length} termos\n• ${(data.movimentacoes||[]).length} movimentações\n${data.gerado_fmt?'• Gerado em: '+data.gerado_fmt:''}\n\nDeseja continuar?`;
+      const resumo=`Isso irá SUBSTITUIR todos os dados atuais.\n\nBackup contém:\n• ${(data.instrumentos||[]).length} instrumentos\n• ${(data.igrejas||[]).length} igrejas\n• ${(data.termos||[]).length} termos\n• ${(data.movimentacoes||[]).length} movimentações\n• ${(data.manutencoes||[]).length} manutenções\n• ${(data.estoque||[]).length} itens de estoque\n${data.gerado_fmt?'• Gerado em: '+data.gerado_fmt:''}\n\nDeseja continuar?`;
       if(!confirm(resumo)){evt.target.value='';return;}
       insts=data.instrumentos||[];
       igrejas=data.igrejas||[];
       termos=data.termos||[];
       movs=data.movimentacoes||[];
+      manutencoes=data.manutencoes||[];
+      estoque=data.estoque||[];
       sv();
       updStats();fillFilters();renderDash();
       const pg=document.querySelector('.page.active');
@@ -1272,8 +1569,10 @@ function impBackup(evt){
         if(id==='termos')renderTR();
         if(id==='movimentacao')renderMV();
         if(id==='seguro')renderSeg();
+        if(id==='manutencao')renderMAN();
+        if(id==='estoque')renderEST();
       }
-      toast(`Backup restaurado — ${insts.length} instrumentos carregados`,'ok');
+      toast(`Backup restaurado — ${insts.length} instrumentos, ${manutencoes.length} manutenções, ${estoque.length} itens de estoque`,'ok');
     }catch(err){
       toast('Erro ao ler backup: arquivo corrompido ou inválido','err');
     }
@@ -1282,10 +1581,205 @@ function impBackup(evt){
   reader.readAsText(file,'UTF-8');
 }
 
+// ══════════ MANUTENÇÃO ══════════
+function renderMAN(){
+  const filt=document.getElementById('fman-status').value;
+  const data=filt?manutencoes.filter(x=>x.status===filt):[...manutencoes];
+  data.sort((a,b)=>b.id-a.id);
+
+  // Stats bar
+  const tot=manutencoes.length,and=manutencoes.filter(x=>x.status==='Em Andamento').length,
+    urg=manutencoes.filter(x=>x.status==='Urgente').length,
+    conc=manutencoes.filter(x=>x.status==='Concluído').length,
+    custTot=manutencoes.reduce((s,x)=>s+(parseFloat(x.custo)||0),0);
+  document.getElementById('man-stats').innerHTML=`
+    <div class="stat s-yellow"><div class="stat-lbl">Total Reparos</div><div class="stat-val">${tot}</div><div class="stat-sub">registrados</div></div>
+    <div class="stat s-orange"><div class="stat-lbl">Em Andamento</div><div class="stat-val">${and}</div><div class="stat-sub">aguardando</div></div>
+    <div class="stat s-red"><div class="stat-lbl">Urgentes</div><div class="stat-val">${urg}</div><div class="stat-sub">prioritários</div></div>
+    <div class="stat s-green"><div class="stat-lbl">Concluídos</div><div class="stat-val">${conc}</div><div class="stat-sub">finalizados</div></div>
+    <div class="stat s-gold"><div class="stat-lbl">Custo Total</div><div class="stat-val" style="font-size:17px">R$ ${custTot.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div class="stat-sub">em reparos</div></div>`;
+
+  const el=document.getElementById('man-list');
+  if(!data.length){el.innerHTML=`<div class="empty"><div class="ei">🔧</div><div class="et">Nenhuma manutenção registrada</div><div class="es">Registre reparos e manutenções dos instrumentos</div></div>`;return;}
+  const tagCls={Concluído:'tag-concluido','Em Andamento':'tag-andamento',Urgente:'tag-urgente'};
+  el.innerHTML=data.map(m=>{
+    const inst=insts.find(i=>i.id===m.instrId);
+    return`<div class="man-item">
+      <div class="man-ico ${m.status==='Concluído'?'done':''}">🔧</div>
+      <div class="man-info" style="flex:1">
+        <div class="man-title">
+          <span class="tag-reparo ${tagCls[m.status]||'tag-andamento'}">${m.status}</span>
+          ${inst?`#${inst.num} ${inst.nome} — ${inst.cor||''}`:'Instrumento não encontrado'}
+        </div>
+        <div class="man-sub">
+          <b>Tipo:</b> ${m.tipo||'—'} &nbsp;·&nbsp;
+          <b>Levado por:</b> ${m.levou||'—'} &nbsp;·&nbsp;
+          <b>Técnico:</b> ${m.tecnico||'—'}
+        </div>
+        <div class="man-sub">
+          <b>Entregue em:</b> ${m.dataEnt?fmtDate(m.dataEnt):'—'} &nbsp;·&nbsp;
+          <b>Concluído em:</b> ${m.dataConc?fmtDate(m.dataConc):'—'} &nbsp;·&nbsp;
+          <b>Custo:</b> ${m.custo?'R$ '+parseFloat(m.custo).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}
+        </div>
+        ${m.obs?`<div class="man-sub" style="font-style:italic;margin-top:2px;color:var(--dim)">${m.obs}</div>`:''}
+      </div>
+      <div class="man-acts">
+        ${m.status!=='Concluído'?`<button class="btn btn-sm btn-success" onclick="concluirMAN(${m.id})">✓ Concluir</button>`:''}
+        <button class="btn btn-sm" onclick="openMAN(${m.id})">✎ Editar</button>
+        <button class="btn btn-sm btn-danger" onclick="conf('man',${m.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function fmtDate(d){if(!d)return'—';const[y,m,dia]=d.split('-');return`${dia}/${m}/${y}`;}
+
+function openMAN(id){
+  eMan=id||null;
+  const m=id?manutencoes.find(x=>x.id===id):null;
+  document.getElementById('man-title').textContent=m?'Editar Registro de Reparo':'Novo Registro de Reparo';
+  document.getElementById('man-sub').textContent=m?'Altere os dados do serviço':'Preencha os dados do serviço';
+  const sel=document.getElementById('man-inst');
+  sel.innerHTML='<option value="">— Selecionar instrumento —</option>'+insts.map(i=>`<option value="${i.id}" ${m?.instrId===i.id?'selected':''}>#${i.num} ${i.nome} (${i.cor||i.marca||'?'})</option>`).join('');
+  document.getElementById('man-tipo').value=m?.tipo||'';
+  document.getElementById('man-status').value=m?.status||'Em Andamento';
+  document.getElementById('man-levou').value=m?.levou||'';
+  document.getElementById('man-tecnico').value=m?.tecnico||'';
+  document.getElementById('man-data-ent').value=m?.dataEnt||new Date().toISOString().slice(0,10);
+  document.getElementById('man-data-conc').value=m?.dataConc||'';
+  document.getElementById('man-custo').value=m?.custo||'';
+  document.getElementById('man-obs').value=m?.obs||'';
+  document.getElementById('ov-man').classList.add('open');
+}
+function closeMAN(){document.getElementById('ov-man').classList.remove('open');eMan=null;}
+function saveMAN(){
+  const instrId=parseInt(document.getElementById('man-inst').value);
+  const tipo=document.getElementById('man-tipo').value;
+  if(!instrId){toast('Selecione o instrumento','err');return;}
+  if(!tipo){toast('Selecione o tipo de reparo','err');return;}
+  const levou=document.getElementById('man-levou').value.trim();
+  if(!levou){toast('Informe quem levou para arrumar','err');return;}
+  const d={
+    instrId,tipo,levou,
+    tecnico:document.getElementById('man-tecnico').value.trim(),
+    status:document.getElementById('man-status').value,
+    dataEnt:document.getElementById('man-data-ent').value,
+    dataConc:document.getElementById('man-data-conc').value,
+    custo:parseFloat(document.getElementById('man-custo').value)||0,
+    obs:document.getElementById('man-obs').value.trim(),
+  };
+  if(eMan){const idx=manutencoes.findIndex(x=>x.id===eMan);manutencoes[idx]={...manutencoes[idx],...d};toast('Reparo atualizado');}
+  else{d.id=Date.now();manutencoes.push(d);toast('Reparo registrado');}
+  // Atualiza status do instrumento se for Em Andamento ou Urgente
+  const iIdx=insts.findIndex(i=>i.id===instrId);
+  if(iIdx>=0&&d.status!=='Concluído'){insts[iIdx].status='Em Manutenção';}
+  if(iIdx>=0&&d.status==='Concluído'&&insts[iIdx].status==='Em Manutenção'){insts[iIdx].status='Disponível';}
+  sv();closeMAN();renderMAN();updStats();fillFilters();
+}
+function concluirMAN(id){
+  const idx=manutencoes.findIndex(x=>x.id===id);
+  if(idx<0)return;
+  manutencoes[idx].status='Concluído';
+  manutencoes[idx].dataConc=manutencoes[idx].dataConc||new Date().toISOString().slice(0,10);
+  const inst=insts.find(i=>i.id===manutencoes[idx].instrId);
+  if(inst&&inst.status==='Em Manutenção'){
+    const iIdx=insts.findIndex(i=>i.id===inst.id);
+    insts[iIdx].status='Disponível';
+    toast(`${inst.nome} marcado como Disponível`,'ok');
+  }
+  sv();renderMAN();updStats();
+  toast('Reparo concluído! ✓','ok');
+}
+
+// ══════════ ESTOQUE ══════════
+function renderEST(){
+  const filt=document.getElementById('fest-cat').value;
+  const data=filt?estoque.filter(x=>x.cat===filt):[...estoque];
+  const totItens=estoque.length,lowStock=estoque.filter(x=>x.qtd<=x.min).length,
+    totVal=estoque.reduce((s,x)=>s+(parseFloat(x.preco||0)*parseInt(x.qtd||0)),0);
+  document.getElementById('est-stats-row').innerHTML=`
+    <div class="stat s-blue"><div class="stat-lbl">Itens Cadastrados</div><div class="stat-val">${totItens}</div><div class="stat-sub">tipos de material</div></div>
+    <div class="stat s-red"><div class="stat-lbl">Estoque Baixo</div><div class="stat-val">${lowStock}</div><div class="stat-sub">abaixo do mínimo</div></div>
+    <div class="stat s-gold"><div class="stat-lbl">Valor Total</div><div class="stat-val" style="font-size:17px">R$ ${totVal.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div class="stat-sub">em estoque</div></div>`;
+  const grid=document.getElementById('est-grid');
+  if(!data.length){grid.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="ei">📦</div><div class="et">Nenhum item cadastrado</div><div class="es">Cadastre acessórios, cordas, palhetas e materiais de reparo</div></div>`;return;}
+  const catIco={Cordas:'🎻',Palhetas:'🎷',Resina:'🟡','Resina/Breu':'🟡','Kit de Reparo':'🛠',Acessórios:'🎼',Limpeza:'🧹',Outros:'📦'};
+  grid.innerHTML=data.map(x=>{
+    const low=x.qtd<=x.min;
+    return`<div class="est-card ${low?'low-stock':''}">
+      <div class="est-hd">
+        <div class="est-ico">${x.ico||catIco[x.cat]||'📦'}</div>
+        <div style="flex:1;min-width:0">
+          <div class="est-nome">${x.nome}</div>
+          <div class="est-cat">${x.cat}</div>
+        </div>
+        ${low?`<span style="background:var(--red-bg);color:var(--red);border:1px solid #f0aaaa;border-radius:20px;padding:2px 7px;font-size:9px;font-weight:700">⚠ BAIXO</span>`:''}
+      </div>
+      <div class="est-body">
+        <div class="est-qty ${low?'low':''}">${x.qtd}</div>
+        <div class="est-qty-lbl">${x.unid||'unid.'} em estoque${x.min?` · mín: ${x.min}`:''}</div>
+        ${x.forn?`<div class="est-row"><span class="est-lbl">Fornecedor</span><span class="est-val" style="font-size:11px">${x.forn}</span></div>`:''}
+        ${x.preco?`<div class="est-row"><span class="est-lbl">Preço unit.</span><span class="est-val">R$ ${parseFloat(x.preco).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>`:''}
+        ${x.obs?`<div style="font-size:10.5px;color:var(--muted);margin-top:4px;font-style:italic">${x.obs}</div>`:''}
+      </div>
+      <div class="est-foot">
+        <div class="est-adj">
+          <button onclick="adjEST(${x.id},-1)" title="Remover 1">−</button>
+          <div class="est-num">${x.qtd}</div>
+          <button onclick="adjEST(${x.id},+1)" title="Adicionar 1">+</button>
+        </div>
+        <button class="btn btn-sm" onclick="openEST(${x.id})">✎</button>
+        <button class="btn btn-sm btn-danger" onclick="conf('est',${x.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function adjEST(id,delta){
+  const idx=estoque.findIndex(x=>x.id===id);
+  if(idx<0)return;
+  const novoQtd=Math.max(0,(parseInt(estoque[idx].qtd)||0)+delta);
+  estoque[idx].qtd=novoQtd;
+  sv();renderEST();updStats();
+  if(novoQtd<=estoque[idx].min)toast(`⚠ ${estoque[idx].nome}: estoque baixo!`,'err');
+}
+function openEST(id){
+  eEst=id||null;
+  const x=id?estoque.find(e=>e.id===id):null;
+  document.getElementById('est-title').textContent=x?'Editar Item de Estoque':'Novo Item de Estoque';
+  document.getElementById('est-nome').value=x?.nome||'';
+  document.getElementById('est-cat').value=x?.cat||'Cordas';
+  document.getElementById('est-ico').value=x?.ico||'';
+  document.getElementById('est-qtd').value=x?.qtd??0;
+  document.getElementById('est-min').value=x?.min??0;
+  document.getElementById('est-unid').value=x?.unid||'unid.';
+  document.getElementById('est-forn').value=x?.forn||'';
+  document.getElementById('est-preco').value=x?.preco||'';
+  document.getElementById('est-obs').value=x?.obs||'';
+  document.getElementById('ov-est').classList.add('open');
+}
+function closeEST(){document.getElementById('ov-est').classList.remove('open');eEst=null;}
+function saveEST(){
+  const nome=document.getElementById('est-nome').value.trim();
+  if(!nome){toast('Informe o nome do item','err');return;}
+  const d={
+    nome,cat:document.getElementById('est-cat').value,
+    ico:document.getElementById('est-ico').value.trim(),
+    qtd:parseInt(document.getElementById('est-qtd').value)||0,
+    min:parseInt(document.getElementById('est-min').value)||0,
+    unid:document.getElementById('est-unid').value,
+    forn:document.getElementById('est-forn').value.trim(),
+    preco:parseFloat(document.getElementById('est-preco').value)||0,
+    obs:document.getElementById('est-obs').value.trim(),
+  };
+  if(eEst){const idx=estoque.findIndex(x=>x.id===eEst);estoque[idx]={...estoque[idx],...d};toast('Item atualizado');}
+  else{d.id=Date.now();estoque.push(d);toast('Item cadastrado');}
+  sv();closeEST();renderEST();updStats();
+}
+
 // ══════════ KEYBOARD ══════════
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
-    ['ov-instr','ov-ig','ov-tr','ov-mv','ov-conf'].forEach(id=>document.getElementById(id).classList.remove('open'));
+    ['ov-instr','ov-ig','ov-tr','ov-mv','ov-conf','ov-man','ov-est'].forEach(id=>document.getElementById(id).classList.remove('open'));
   }
 });
 
