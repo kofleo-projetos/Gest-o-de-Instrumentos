@@ -500,6 +500,7 @@ tbody td{padding:8px 10px;font-size:12.5px;color:var(--text);vertical-align:midd
           <select class="fsel" id="fman-status" onchange="renderMAN()" style="font-size:11px">
             <option value="">Todos</option><option>Em Andamento</option><option>Concluído</option><option>Urgente</option>
           </select>
+          <button class="btn btn-gold" onclick="pdfRelatorioMAN()">📊 Relatório de Serviços</button>
           <button class="btn btn-primary" onclick="openMAN()">🔧 Novo Reparo</button>
         </div>
       </div>
@@ -1289,7 +1290,7 @@ function expCSV(){
 function expPDFLista(){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const data=getFiltered();
+  const data=getFiltered().sort((a,b)=>(a.num||0)-(b.num||0));
   const hoje=new Date().toLocaleDateString('pt-BR');
 
   // ── Cabeçalho principal ──
@@ -1609,6 +1610,7 @@ function renderMAN(){
       <div class="man-info" style="flex:1">
         <div class="man-title">
           <span class="tag-reparo ${tagCls[m.status]||'tag-andamento'}">${m.status}</span>
+          ${m.numOS?`<span style="background:var(--navy-light);color:var(--navy);border:1px solid #afc3e8;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;font-family:'Playfair Display',serif">OS #${m.numOS}</span>`:''}
           ${inst?`#${inst.num} ${inst.nome} — ${inst.cor||''}`:'Instrumento não encontrado'}
         </div>
         <div class="man-sub">
@@ -1624,6 +1626,7 @@ function renderMAN(){
         ${m.obs?`<div class="man-sub" style="font-style:italic;margin-top:2px;color:var(--dim)">${m.obs}</div>`:''}
       </div>
       <div class="man-acts">
+        <button class="btn btn-sm btn-gold" onclick="pdfOS(${m.id})">📋 Comprovante OS</button>
         ${m.status!=='Concluído'?`<button class="btn btn-sm btn-success" onclick="concluirMAN(${m.id})">✓ Concluir</button>`:''}
         <button class="btn btn-sm" onclick="openMAN(${m.id})">✎ Editar</button>
         <button class="btn btn-sm btn-danger" onclick="conf('man',${m.id})">✕</button>
@@ -1640,7 +1643,7 @@ function openMAN(id){
   document.getElementById('man-title').textContent=m?'Editar Registro de Reparo':'Novo Registro de Reparo';
   document.getElementById('man-sub').textContent=m?'Altere os dados do serviço':'Preencha os dados do serviço';
   const sel=document.getElementById('man-inst');
-  sel.innerHTML='<option value="">— Selecionar instrumento —</option>'+insts.map(i=>`<option value="${i.id}" ${m?.instrId===i.id?'selected':''}>#${i.num} ${i.nome} (${i.cor||i.marca||'?'})</option>`).join('');
+  sel.innerHTML='<option value="">— Selecionar instrumento —</option>'+[...insts].sort((a,b)=>(a.num||0)-(b.num||0)).map(i=>`<option value="${i.id}" ${m?.instrId===i.id?'selected':''}>#${i.num} ${i.nome} (${i.cor||i.marca||'?'}) — ${i.igreja||'?'}</option>`).join('');
   document.getElementById('man-tipo').value=m?.tipo||'';
   document.getElementById('man-status').value=m?.status||'Em Andamento';
   document.getElementById('man-levou').value=m?.levou||'';
@@ -1669,7 +1672,7 @@ function saveMAN(){
     obs:document.getElementById('man-obs').value.trim(),
   };
   if(eMan){const idx=manutencoes.findIndex(x=>x.id===eMan);manutencoes[idx]={...manutencoes[idx],...d};toast('Reparo atualizado');}
-  else{d.id=Date.now();manutencoes.push(d);toast('Reparo registrado');}
+  else{d.id=Date.now();d.numOS=manutencoes.length>0?Math.max(...manutencoes.map(x=>x.numOS||0))+1:1;manutencoes.push(d);toast(`OS #${d.numOS} registrada`,'ok');}
   // Atualiza status do instrumento se for Em Andamento ou Urgente
   const iIdx=insts.findIndex(i=>i.id===instrId);
   if(iIdx>=0&&d.status!=='Concluído'){insts[iIdx].status='Em Manutenção';}
@@ -1774,6 +1777,180 @@ function saveEST(){
   if(eEst){const idx=estoque.findIndex(x=>x.id===eEst);estoque[idx]={...estoque[idx],...d};toast('Item atualizado');}
   else{d.id=Date.now();estoque.push(d);toast('Item cadastrado');}
   sv();closeEST();renderEST();updStats();
+}
+
+// ══════════ PDF COMPROVANTE OS (2 VIAS) ══════════
+function pdfOS(id){
+  const m=manutencoes.find(x=>x.id===id);
+  if(!m){toast('OS não encontrada','err');return;}
+  const inst=insts.find(i=>i.id===m.instrId);
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const hoje=new Date().toLocaleDateString('pt-BR');
+  const osNum=m.numOS||m.id;
+  const statusCor=m.status==='Concluído'?[26,110,63]:m.status==='Urgente'?[179,28,28]:[160,92,0];
+
+  function drawVia(yOff,label){
+    // Cabeçalho
+    doc.setFillColor(28,53,87);doc.rect(0,yOff,210,22,'F');
+    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(13);
+    doc.text('CONGREGAÇÃO CRISTÃ NO BRASIL — CCB ORQUESTRA',105,yOff+9,{align:'center'});
+    doc.setFontSize(9);doc.text('ORDEM DE SERVIÇO — COMPROVANTE DE MANUTENÇÃO',105,yOff+16,{align:'center'});
+
+    // Número OS + via
+    doc.setFillColor(234,239,247);doc.rect(14,yOff+25,182,10,'F');
+    doc.setTextColor(28,53,87);doc.setFont('helvetica','bold');doc.setFontSize(11);
+    doc.text(`OS Nº ${osNum}`,18,yOff+32);
+    doc.setFontSize(9);doc.setTextColor(80,80,80);
+    doc.text(`Emitido em: ${hoje}`,105,yOff+32,{align:'center'});
+    doc.setFillColor(...statusCor);doc.rect(155,yOff+26,41,8,'F');
+    doc.setTextColor(255,255,255);doc.setFontSize(8);
+    doc.text(m.status.toUpperCase(),175,yOff+32,{align:'center'});
+
+    // Via label
+    doc.setFillColor(245,244,241);doc.rect(14,yOff+37,182,6,'F');
+    doc.setTextColor(100,90,70);doc.setFont('helvetica','bold');doc.setFontSize(7.5);
+    doc.text(`▐ ${label}`,16,yOff+41.5);
+
+    // Dados instrumento
+    doc.setFillColor(238,236,232);doc.rect(14,yOff+46,182,6,'F');
+    doc.setTextColor(28,53,87);doc.setFont('helvetica','bold');doc.setFontSize(7);
+    doc.text('DADOS DO INSTRUMENTO',16,yOff+50.5);
+    const rows=[
+      ['Instrumento:',inst?`#${inst.num} ${inst.nome}`:'—','Cor / Tom:',inst?`${inst.cor||'—'} · ${inst.modelo||'—'}`:'—'],
+      ['Marca:',inst?.marca||'—','Igreja:',inst?.igreja||'—'],
+    ];
+    doc.setTextColor(24,22,15);doc.setFont('helvetica','normal');doc.setFontSize(8.5);
+    let ry=yOff+57;
+    rows.forEach(r=>{
+      doc.setFont('helvetica','bold');doc.text(r[0],16,ry);doc.setFont('helvetica','normal');doc.text(r[1],42,ry);
+      doc.setFont('helvetica','bold');doc.text(r[2],110,ry);doc.setFont('helvetica','normal');doc.text(r[3],128,ry);
+      ry+=6;
+    });
+
+    // Dados serviço
+    doc.setFillColor(238,236,232);doc.rect(14,ry,182,6,'F');
+    doc.setTextColor(28,53,87);doc.setFont('helvetica','bold');doc.setFontSize(7);
+    doc.text('DADOS DO SERVIÇO',16,ry+4.5);ry+=9;
+    const sRows=[
+      ['Tipo de Reparo:',m.tipo||'—','Levado por:',m.levou||'—'],
+      ['Técnico / Oficina:',m.tecnico||'—','Data de Entrega:',m.dataEnt?fmtDate(m.dataEnt):'—'],
+      ['Data de Conclusão:',m.dataConc?fmtDate(m.dataConc):'—','Custo R$:',m.custo?'R$ '+parseFloat(m.custo).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'],
+    ];
+    doc.setTextColor(24,22,15);doc.setFontSize(8.5);
+    sRows.forEach(r=>{
+      doc.setFont('helvetica','bold');doc.text(r[0],16,ry);doc.setFont('helvetica','normal');doc.text(r[1],58,ry);
+      doc.setFont('helvetica','bold');doc.text(r[2],110,ry);doc.setFont('helvetica','normal');doc.text(r[3],140,ry);
+      ry+=6;
+    });
+    if(m.obs){
+      doc.setFont('helvetica','bold');doc.text('Observações:',16,ry);doc.setFont('helvetica','normal');
+      const obsLines=doc.splitTextToSize(m.obs,140);obsLines.forEach(l=>{doc.text(l,46,ry);ry+=5;});ry+=2;
+    }else{ry+=4;}
+
+    // Assinaturas
+    ry+=4;
+    doc.setDrawColor(180,180,180);
+    doc.line(16,ry,95,ry);doc.line(115,ry,194,ry);
+    ry+=4;doc.setFontSize(7.5);doc.setTextColor(80,80,80);doc.setFont('helvetica','normal');
+    doc.text('Responsável pelo Instrumento',16,ry);doc.text('Técnico / Encarregado',115,ry);
+    ry+=4;doc.setFontSize(7);doc.setTextColor(140,140,140);
+    doc.text(m.levou||'',16,ry);doc.text(m.tecnico||'',115,ry);
+
+    // Rodapé via
+    doc.setDrawColor(200,196,186);doc.setLineWidth(0.3);
+    doc.line(14,yOff+128,196,yOff+128);
+  }
+
+  // Via 1 — Entrega (quem deixou o instrumento)
+  drawVia(5,'1ª VIA — ENTREGA (quem deixou o instrumento)');
+  // Linha pontilhada separando as vias
+  doc.setLineDash([2,2]);doc.setDrawColor(150,150,150);doc.setLineWidth(0.5);
+  doc.line(10,142,200,142);doc.setLineDash([]);
+  doc.setTextColor(140,140,140);doc.setFontSize(7);
+  doc.text('✂ Recorte aqui',100,140,{align:'center'});
+  // Via 2 — Retirada (comprovante para retirada)
+  drawVia(145,'2ª VIA — RETIRADA (comprovante para retirada)');
+
+  doc.save(`OS_${osNum}_${inst?.nome||'instrumento'}.pdf`);
+  toast(`Comprovante OS #${osNum} gerado — 2 vias`,'inf');
+}
+
+// ══════════ PDF RELATÓRIO DE SERVIÇOS ══════════
+function pdfRelatorioMAN(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const hoje=new Date().toLocaleDateString('pt-BR');
+  const filt=document.getElementById('fman-status').value;
+  const data=filt?manutencoes.filter(x=>x.status===filt):[...manutencoes];
+  data.sort((a,b)=>(a.numOS||0)-(b.numOS||0));
+
+  doc.setFillColor(28,53,87);doc.rect(0,0,297,20,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(12);
+  doc.text('CCB ORQUESTRA — RELATÓRIO DE SERVIÇOS DE MANUTENÇÃO',148,9,{align:'center'});
+  doc.setFontSize(7.5);doc.text(`Emitido em: ${hoje}  |  Total: ${data.length} registros${filt?' · Filtro: '+filt:''}`,14,16);
+
+  // Sumário
+  const tot=data.length,conc=data.filter(x=>x.status==='Concluído').length,
+    custo=data.reduce((s,x)=>s+(parseFloat(x.custo)||0),0);
+  doc.setFillColor(234,239,247);doc.rect(7,22,283,10,'F');
+  doc.setTextColor(28,53,87);doc.setFont('helvetica','bold');doc.setFontSize(8);
+  doc.text(`Total de OS: ${tot}   |   Concluídas: ${conc}   |   Em Andamento: ${data.filter(x=>x.status==='Em Andamento').length}   |   Urgentes: ${data.filter(x=>x.status==='Urgente').length}   |   Custo Total: R$ ${custo.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,148,29,{align:'center'});
+
+  const hdr=['OS #','Instrumento','Igreja','Tipo Reparo','Status','Levado por','Técnico','Entrega','Conclusão','Custo R$','Observações'];
+  const cw=[12,30,22,26,18,26,24,16,16,16,77];
+  let y=39,x=7;
+  doc.setFillColor(238,236,232);doc.rect(7,y-4,283,6,'F');
+  doc.setTextColor(80,80,80);doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+  hdr.forEach((h,i)=>{doc.text(h,x+1,y);x+=cw[i];});
+  y+=5;doc.setFont('helvetica','normal');doc.setTextColor(24,22,15);
+
+  data.forEach((m,ri)=>{
+    if(y>192){
+      doc.addPage();
+      doc.setFillColor(28,53,87);doc.rect(0,0,297,18,'F');
+      doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(9);
+      doc.text('CCB ORQUESTRA — RELATÓRIO DE SERVIÇOS (continuação)',148,12,{align:'center'});
+      doc.setTextColor(24,22,15);doc.setFont('helvetica','normal');
+      y=26;x=7;
+      doc.setFillColor(238,236,232);doc.rect(7,y-4,283,6,'F');
+      doc.setTextColor(80,80,80);doc.setFont('helvetica','bold');doc.setFontSize(6.5);
+      hdr.forEach((h,i)=>{doc.text(h,x+1,y);x+=cw[i];});
+      y+=5;doc.setFont('helvetica','normal');doc.setTextColor(24,22,15);
+    }
+    if(ri%2===0){doc.setFillColor(247,246,241);doc.rect(7,y-3.5,283,5.5,'F');}
+    const inst=insts.find(i=>i.id===m.instrId);
+    const stCor=m.status==='Concluído'?[26,110,63]:m.status==='Urgente'?[179,28,28]:[160,92,0];
+    x=7;doc.setFontSize(6.5);
+    const cells=[
+      String(m.numOS||'—'),
+      inst?`#${inst.num} ${inst.nome}`:'—',
+      inst?.igreja||'—',
+      m.tipo||'—',
+      m.status,
+      m.levou||'—',
+      m.tecnico||'—',
+      m.dataEnt?fmtDate(m.dataEnt):'—',
+      m.dataConc?fmtDate(m.dataConc):'—',
+      m.custo?parseFloat(m.custo).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—',
+      m.obs||'',
+    ];
+    cells.forEach((c,i)=>{
+      if(i===4){doc.setTextColor(...stCor);doc.setFont('helvetica','bold');}
+      else{doc.setTextColor(24,22,15);doc.setFont('helvetica','normal');}
+      const t=doc.splitTextToSize(String(c),cw[i]-1.5)[0]||'';
+      doc.text(t,x+1,y);x+=cw[i];
+    });
+    y+=5.5;
+  });
+
+  // Rodapé
+  const yF=y+4;
+  doc.setFillColor(28,53,87);doc.rect(7,yF-4,283,6,'F');
+  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(7.5);
+  doc.text(`TOTAL: ${data.length} OS  |  Concluídas: ${conc}  |  Custo Total: R$ ${custo.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,10,yF);
+  doc.save(`relatorio_manutencoes_${hoje.replace(/\//g,'-')}.pdf`);
+  toast('Relatório de serviços gerado!','inf');
 }
 
 // ══════════ KEYBOARD ══════════
